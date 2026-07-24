@@ -1,0 +1,30 @@
+Act as an Expert Front-End Engineer specializing in Next.js, TypeScript, and Tailwind CSS.
+Your task is to build a Minimum Viable Product (MVP) for a Minimalist Wallpaper Generator Web App, similar to a free utility tool.
+
+Tech Stack:
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- HTML5 Canvas API (for client-side rendering, strictly no backend image processing to keep server costs at $0)
+- Lucide React (for icons)
+
+Core Requirements:
+1. UI/UX Layout: 
+   - Clean, highly minimalist, and responsive interface.
+   - A main preview area showing the currently generated wallpaper.
+   - A sidebar or control panel containing the settings.
+
+2. Core Functionality:
+   - A prominent "Generate" button that creates procedural minimalist wallpapers (e.g., smooth gradients, abstract waves, or simple geometric shapes) using the HTML5 Canvas API.
+   - Color Palette Selector: Allow users to switch between 3-4 predefined aesthetic color palettes.
+   - Resolution Selector: Options for "Desktop 4K" (3840x2160) and "iPhone" (1290x2796).
+
+3. Export Feature:
+   - "Download" buttons that convert the Canvas element to a high-quality PNG and trigger a direct file download.
+
+4. Monetization Placeholders (Crucial for Business Logic):
+   - Affiliate Area: Add a clean placeholder section below the controls titled "Desk Setup Recommendations" for future affiliate links.
+   - Interstitial Ad Logic: Implement a simple state click-counter on the "Generate" button. If the button is clicked 4 times (clicks % 4 === 0), trigger a simulated ad overlay or simple `alert('Ad Placeholder: Interstitial Ad displays here')` before generating the new image.
+
+Deliverables:
+Please provide the essential file structure, the code for the main layout (`app/page.tsx`), and the core Canvas rendering component (`components/WallpaperGenerator.tsx`). Ensure the code is production-ready, strictly typed, and well-commented.
