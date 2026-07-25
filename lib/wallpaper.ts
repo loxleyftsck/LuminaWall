@@ -18,9 +18,13 @@ export interface Resolution {
   label: string;
   width: number;
   height: number;
+  deviceRef?: string;
+  ppi?: string;
+  panelTech?: string;
 }
 
 export type StyleId =
+  | "topography"
   | "flow"
   | "cosmic"
   | "gradient"
@@ -34,6 +38,8 @@ export type StyleId =
   | "julia"
   | "lorenz"
   | "flora"
+  | "penrose"
+  | "quantum"
   | "tokyo"
   | "rome";
 export type Tone = "light" | "dark";
@@ -106,16 +112,95 @@ export const PALETTES: Palette[] = [
     name: "Emerald",
     colors: ["#e9f3ec", "#a8ccb4", "#2f6e50", "#0a2018"],
   },
+  {
+    id: "amoled_black",
+    name: "AMOLED True Black",
+    colors: ["#f8fafc", "#60a5fa", "#2563eb", "#000000"],
+  },
+  {
+    id: "champagne_silk",
+    name: "Champagne Silk",
+    colors: ["#faf5ef", "#e8d3b9", "#b38968", "#1c1410"],
+  },
 ];
 
 export const RESOLUTIONS: Resolution[] = [
-  { id: "desktop4k", label: "Desktop 4K", width: 3840, height: 2160 },
-  { id: "iphone", label: "iPhone", width: 1290, height: 2796 },
-  { id: "ipad", label: "iPad", width: 2048, height: 2732 },
-  { id: "macbook", label: "MacBook", width: 3024, height: 1964 },
+  {
+    id: "desktop4k",
+    label: "Desktop 4K",
+    width: 3840,
+    height: 2160,
+    deviceRef: "4K Monitor / Studio Display",
+    ppi: "Ultra Sharp Desktop",
+    panelTech: "IPS / OLED Monitor",
+  },
+  {
+    id: "iphone",
+    label: "iPhone Pro Max",
+    width: 1290,
+    height: 2796,
+    deviceRef: "iPhone 16 / 15 Pro Max",
+    ppi: "~460 PPI",
+    panelTech: "Super Retina XDR OLED",
+  },
+  {
+    id: "fhd_plus",
+    label: "FHD+ (1080p)",
+    width: 1080,
+    height: 2400,
+    deviceRef: "Galaxy S24 / Redmi Note 13 / Poco X6",
+    ppi: "~390 - 410 PPI",
+    panelTech: "Super AMOLED / OLED",
+  },
+  {
+    id: "one_five_k",
+    label: "1.5K (1220p)",
+    width: 1220,
+    height: 2712,
+    deviceRef: "Xiaomi 14T / Poco F6 Pro / Realme GT 6",
+    ppi: "~440 - 460 PPI (Sweet Spot)",
+    panelTech: "Dynamic AMOLED 2X / Fluid AMOLED",
+  },
+  {
+    id: "qhd_plus",
+    label: "QHD+ (1440p)",
+    width: 1440,
+    height: 3200,
+    deviceRef: "Galaxy S24 Ultra / OnePlus 12 / Pixel 9 Pro",
+    ppi: "~500 - 525 PPI (Gold Standard)",
+    panelTech: "LTPO OLED / LTPO AMOLED",
+  },
+  {
+    id: "mobile_4k",
+    label: "Mobile 4K",
+    width: 1644,
+    height: 3840,
+    deviceRef: "Sony Xperia 1 VI / Xperia 1 V",
+    ppi: "~643 PPI (Highest Mobile)",
+    panelTech: "4K HDR OLED",
+  },
+  {
+    id: "ipad",
+    label: "iPad",
+    width: 2048,
+    height: 2732,
+    deviceRef: "iPad Pro 13-inch",
+    ppi: "~264 PPI",
+    panelTech: "Tandem OLED / Liquid Retina",
+  },
+  {
+    id: "macbook",
+    label: "MacBook",
+    width: 3024,
+    height: 1964,
+    deviceRef: 'MacBook Pro 16"',
+    ppi: "~254 PPI",
+    panelTech: "Liquid Retina XDR",
+  },
 ];
 
-export const STYLES: { id: StyleId; name: string }[] = [
+export const STYLES: { id: StyleId; name: string; journalRef?: string }[] = [
+  { id: "topography", name: "Gradient Topography" },
   { id: "flow", name: "Flow" },
   { id: "cosmic", name: "Cosmic" },
   { id: "gradient", name: "Gradient" },
@@ -125,12 +210,12 @@ export const STYLES: { id: StyleId; name: string }[] = [
   { id: "mandala", name: "Mandala" },
   { id: "landscape", name: "Landscape" },
   { id: "parametric", name: "Parametric" },
-  { id: "chladni", name: "Chladni" },
-  { id: "julia", name: "Julia" },
-  { id: "lorenz", name: "Lorenz" },
-  { id: "flora", name: "Fractal Flora" },
-  { id: "tokyo", name: "Tokyo Neon Grid" },
-  { id: "rome", name: "Roman Colosseum" },
+  { id: "chladni", name: "Chladni Plate", journalRef: "E. Chladni (1787) - Entdeckungen über die Theorie des Klanges" },
+  { id: "julia", name: "Julia Set", journalRef: "G. Julia (1918) - Journal de Mathématiques Pures et Appliquées" },
+  { id: "lorenz", name: "Lorenz Attractor", journalRef: "E. Lorenz (1963) - Journal of the Atmospheric Sciences" },
+  { id: "flora", name: "Fractal Flora", journalRef: "P. Prusinkiewicz (1990) - The Algorithmic Beauty of Plants" },
+  { id: "penrose", name: "Penrose Tiling", journalRef: "R. Penrose (1974) - Inst. Math. Appl. / Math. Intelligencer" },
+  { id: "quantum", name: "Quantum Waves", journalRef: "E. Schrödinger (1926) - Annalen der Physik" },
 ];
 
 /* ---------- helpers ---------- */
@@ -1180,11 +1265,12 @@ function drawFlora(
 }
 
 /**
- * Tokyo Neon Grid (Cyber-Minimalism).
- * Generates an abstract, clean metropolis skyline using recursive grid subdivision.
- * Features thin neon accent glowing wires over dark cityscapes.
+ * Penrose Aperiodic Tiling (Quasicrystal Geometry).
+ * Reference: Roger Penrose (1974) - "The Role of Aesthetics in Pure and Applied Mathematical Research" (Inst. Math. Appl.)
+ * & Penrose (1979) "Pentaplexity" (Mathematical Intelligencer).
+ * Uses recursive golden ratio (phi) triangle subdivision with pentagonal quasicrystal symmetry.
  */
-function drawTokyo(
+function drawPenrose(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
@@ -1192,75 +1278,111 @@ function drawTokyo(
   tone: Tone,
 ) {
   paintBase(ctx, w, h, p, tone);
-  
+
   const dark = tone === "dark";
-  const neonColor = dark ? p.colors[0] : p.colors[3];
-  const windowColor = dark ? p.colors[1] : p.colors[2];
+  const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
 
-  // Base setup
-  ctx.save();
-  ctx.strokeStyle = neonColor + "3d"; // Translucent neon wire
-  ctx.lineWidth = Math.max(1, Math.min(w, h) / 2200);
+  interface Triangle {
+    type: number; // 0 = thin (36-72-72), 1 = thick (108-36-36)
+    a: [number, number];
+    b: [number, number];
+    c: [number, number];
+  }
 
-  const cityWidth = w * 0.9;
-  const cityHeight = h * 0.7;
-  const startX = (w - cityWidth) / 2;
-  const startY = h - cityHeight;
+  // Generate initial decagon of 10 Robinson triangles at canvas center
+  const center: [number, number] = [w / 2, h / 2];
+  const radius = Math.max(w, h) * 0.75;
+  let triangles: Triangle[] = [];
 
-  // Recursive subdivision algorithm to generate clean skyscrapers blocks
-  function subdivide(x: number, y: number, blockW: number, blockH: number, depth: number) {
-    if (depth > 4 || blockW < w * 0.05 || Math.random() < 0.2) {
-      // Draw building block silhouette outline
-      ctx.strokeRect(x, y, blockW, blockH);
-      
-      // Draw minimal repeating windows grid internally
-      const winCols = Math.max(2, Math.floor(blockW / 24));
-      const winRows = Math.max(3, Math.floor(blockH / 32));
-      const stepX = blockW / (winCols + 1);
-      const stepY = blockH / (winRows + 1);
-
-      ctx.fillStyle = windowColor + "14"; // Ultra soft window fill
-      for (let c = 1; c <= winCols; c++) {
-        for (let r = 1; r <= winRows; r++) {
-          if (Math.random() > 0.4) { // random lit windows
-            ctx.fillRect(x + c * stepX - 2, y + r * stepY - 2, 4, 4);
-          }
-        }
-      }
-      return;
-    }
-
-    // Split vertically or horizontally
-    if (Math.random() > 0.4) {
-      const split = blockW * rand(0.3, 0.7);
-      subdivide(x, y, split, blockH, depth + 1);
-      subdivide(x + split, y, blockW - split, blockH, depth + 1);
+  for (let i = 0; i < 10; i++) {
+    const angle1 = ((i - 0.5) * Math.PI) / 5;
+    const angle2 = ((i + 0.5) * Math.PI) / 5;
+    const b: [number, number] = [
+      center[0] + radius * Math.cos(angle1),
+      center[1] + radius * Math.sin(angle1),
+    ];
+    const c: [number, number] = [
+      center[0] + radius * Math.cos(angle2),
+      center[1] + radius * Math.sin(angle2),
+    ];
+    if (i % 2 === 0) {
+      triangles.push({ type: 0, a: center, b: b, c: c });
     } else {
-      const split = blockH * rand(0.4, 0.8);
-      subdivide(x, y, blockW, split, depth + 1);
-      subdivide(x, y + split, blockW, blockH - split, depth + 1);
+      triangles.push({ type: 0, a: center, b: c, c: b });
     }
   }
 
-  // Draw 8 columns of skyscraper networks
-  const colCount = 6 + Math.floor(rand(0, 3));
-  const colW = cityWidth / colCount;
-  for (let c = 0; c < colCount; c++) {
-    const colX = startX + c * colW;
-    const colH = cityHeight * rand(0.5, 1.0);
-    const colY = h - colH;
-    subdivide(colX, colY, colW - 8, colH, 0);
+  // Subdivide 6 levels deep
+  const subdivisions = 6;
+  for (let step = 0; step < subdivisions; step++) {
+    const next: Triangle[] = [];
+    for (const tri of triangles) {
+      if (tri.type === 0) {
+        // Thin triangle subdivision: A + (B - A) / phi
+        const pPoint: [number, number] = [
+          tri.a[0] + (tri.b[0] - tri.a[0]) / GOLDEN_RATIO,
+          tri.a[1] + (tri.b[1] - tri.a[1]) / GOLDEN_RATIO,
+        ];
+        next.push({ type: 0, a: tri.c, b: pPoint, c: tri.a });
+        next.push({ type: 1, a: tri.c, b: tri.b, c: pPoint });
+      } else {
+        // Thick triangle subdivision
+        const qPoint: [number, number] = [
+          tri.b[0] + (tri.a[0] - tri.b[0]) / GOLDEN_RATIO,
+          tri.b[1] + (tri.a[1] - tri.b[1]) / GOLDEN_RATIO,
+        ];
+        const rPoint: [number, number] = [
+          tri.b[0] + (tri.c[0] - tri.b[0]) / GOLDEN_RATIO,
+          tri.b[1] + (tri.c[1] - tri.b[1]) / GOLDEN_RATIO,
+        ];
+        next.push({ type: 1, a: qPoint, b: tri.c, c: tri.a });
+        next.push({ type: 0, a: qPoint, b: rPoint, c: tri.c });
+        next.push({ type: 1, a: rPoint, b: tri.b, c: qPoint });
+      }
+    }
+    triangles = next;
+  }
+
+  // Draw Penrose Tiles
+  ctx.save();
+  const strokeColor = dark ? p.colors[0] : p.colors[3];
+  const alphaStroke = dark ? "40" : "60";
+  ctx.lineWidth = Math.max(0.6, Math.min(w, h) / 2400);
+
+  for (let i = 0; i < triangles.length; i++) {
+    const tri = triangles[i];
+    const colHex = p.colors[tri.type === 0 ? 1 : 2];
+
+    ctx.fillStyle = colHex + (dark ? "18" : "25");
+    ctx.beginPath();
+    ctx.moveTo(tri.a[0], tri.a[1]);
+    ctx.lineTo(tri.b[0], tri.b[1]);
+    ctx.lineTo(tri.c[0], tri.c[1]);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = strokeColor + alphaStroke;
+    ctx.stroke();
+  }
+
+  // Draw concentric glowing Penrose decagram guidelines
+  ctx.strokeStyle = p.colors[0] + "20";
+  ctx.lineWidth = 1;
+  for (let r = radius * 0.1; r < radius; r += radius * 0.18) {
+    ctx.beginPath();
+    ctx.arc(center[0], center[1], r, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   ctx.restore();
 }
 
 /**
- * Roman Colosseum (Classical Arch Geometry).
- * Draws sweeping concentrical arches and columns inspired by Roman structural engineering.
- * Uses polar coordinate projection for clean, classical geometry.
+ * Quantum Wave Interference & Superposition.
+ * Reference: Erwin Schrödinger (1926) - "Quantisierung als Eigenwertproblem" (Annalen der Physik, Vol. 384, pp. 361-376).
+ * Simulates multi-source complex wavefunction interference patterns |Psi|^2 with caustic field contours.
  */
-function drawRome(
+function drawQuantum(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
@@ -1268,78 +1390,202 @@ function drawRome(
   tone: Tone,
 ) {
   paintBase(ctx, w, h, p, tone);
-  
+
   const dark = tone === "dark";
-  const archColor = dark ? p.colors[0] : p.colors[3];
-  const shadowColor = dark ? p.colors[1] : p.colors[2];
+  const numSources = 6;
+  const sources: { x: number; y: number; k: number; phase: number; amp: number }[] = [];
 
-  ctx.save();
-  ctx.translate(w / 2, h * 0.45); // Center Colosseum arena
-
-  // Scale bounds
-  const size = Math.min(w, h);
-  const tiers = 3; // Colosseum levels
-  const radiusStep = size * 0.09;
-  let r = size * 0.15;
-
-  ctx.lineWidth = Math.max(1, size / 1600);
-
-  for (let t = 0; t < tiers; t++) {
-    const nextR = r + radiusStep;
-    
-    // 1. Concentric horizontal support lines
-    ctx.strokeStyle = archColor + "3d";
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.arc(0, 0, nextR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 2. Pillars and arches layout around the circle
-    const archCount = 18 + t * 6; // Arches increase with radius
-    const angleStep = (Math.PI * 2) / archCount;
-
-    for (let a = 0; a < archCount; a++) {
-      const angle = a * angleStep;
-      
-      ctx.save();
-      ctx.rotate(angle);
-
-      // Draw pillars
-      ctx.strokeStyle = shadowColor + "22";
-      ctx.beginPath();
-      ctx.moveTo(-2, r);
-      ctx.lineTo(-2, nextR);
-      ctx.moveTo(2, r);
-      ctx.lineTo(2, nextR);
-      ctx.stroke();
-
-      // Draw arch top curvature (bezier arches)
-      ctx.strokeStyle = archColor + "4d";
-      ctx.beginPath();
-      const archW = r * Math.tan(angleStep / 2) * 1.5;
-      const archTop = nextR - radiusStep * 0.35;
-      ctx.moveTo(-archW, archTop);
-      ctx.bezierCurveTo(-archW, nextR, archW, nextR, archW, archTop);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-    
-    r = nextR;
+  for (let i = 0; i < numSources; i++) {
+    const angle = (i * Math.PI * 2) / numSources + rand(-0.2, 0.2);
+    const rad = Math.min(w, h) * rand(0.15, 0.38);
+    sources.push({
+      x: w / 2 + Math.cos(angle) * rad,
+      y: h / 2 + Math.sin(angle) * rad,
+      k: rand(0.015, 0.04),
+      phase: rand(0, Math.PI * 2),
+      amp: rand(0.8, 1.3),
+    });
   }
 
-  // Draw ground radial axis guidelines
-  ctx.strokeStyle = shadowColor + "14";
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i < 32; i++) {
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(i * Math.PI / 16) * r, Math.sin(i * Math.PI / 16) * r);
-    ctx.stroke();
+  // Render probability amplitude grid onto offscreen buffer
+  const scale = 4;
+  const sw = Math.ceil(w / scale);
+  const sh = Math.ceil(h / scale);
+
+  const off = document.createElement("canvas");
+  off.width = sw;
+  off.height = sh;
+  const octx = off.getContext("2d");
+  if (!octx) return;
+
+  const img = octx.createImageData(sw, sh);
+  const data = img.data;
+  const lut = buildPaletteLUT(p, tone);
+
+  let i = 0;
+  for (let y = 0; y < sh; y++) {
+    const py = y * scale;
+    for (let x = 0; x < sw; x++) {
+      const px = x * scale;
+      let re = 0;
+      let im = 0;
+
+      for (let s = 0; s < numSources; s++) {
+        const src = sources[s];
+        const dx = px - src.x;
+        const dy = py - src.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 1.0;
+        const arg = src.k * dist + src.phase;
+        const amp = src.amp / Math.pow(dist, 0.35);
+        re += amp * Math.cos(arg);
+        im += amp * Math.sin(arg);
+      }
+
+      // Quantum probability density |Psi|^2
+      const probDensity = re * re + im * im;
+      const val = Math.sin(probDensity * 1.8) * 0.5 + 0.5;
+
+      const idx = Math.min(255, Math.floor(val * 255)) * 3;
+      data[i++] = lut[idx];
+      data[i++] = lut[idx + 1];
+      data[i++] = lut[idx + 2];
+      data[i++] = 255;
+    }
+  }
+
+  octx.putImageData(img, 0, 0);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
+  ctx.drawImage(off, 0, 0, w, h);
+  ctx.globalCompositeOperation = "source-over";
+
+  // Draw glowing quantum nodal curves (phase wavefront boundaries)
+  ctx.strokeStyle = dark ? p.colors[0] + "50" : p.colors[3] + "50";
+  ctx.lineWidth = Math.max(1, Math.min(w, h) / 1400);
+
+  for (let s = 0; s < numSources; s++) {
+    const src = sources[s];
+    const waveRadiusStep = Math.PI / src.k;
+    for (let r = waveRadiusStep; r < Math.max(w, h); r += waveRadiusStep) {
+      ctx.beginPath();
+      ctx.arc(src.x, src.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
 }
+
+/**
+ * Gradient Topography (Smooth Layered Shapes).
+ * Inspired by Cool Backgrounds & modern topographic contour art.
+ * Draws stacked, silky-smooth organic contour layers stepping through the color palette.
+ */
+function drawTopography(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  paintBase(ctx, w, h, p, tone);
+
+  const dark = tone === "dark";
+  const colors = dark ? [...p.colors].reverse() : p.colors;
+  const numLayers = 14;
+
+  // Origin point for the topography sweep (top-right or right edge)
+  const originX = w * rand(0.75, 1.25);
+  const originY = -h * rand(0.1, 0.35);
+  const maxRadius = Math.sqrt(w * w + h * h) * 1.35;
+
+  const noise2D = createNoise2D();
+  const seedOffset = rand(0, 100);
+
+  ctx.save();
+
+  // Helper to sample smooth color across palette stops
+  function getLayerColor(t: number): string {
+    const clampedT = Math.max(0, Math.min(1, t));
+    const stops = colors.map((hex) => [
+      parseInt(hex.slice(1, 3), 16),
+      parseInt(hex.slice(3, 5), 16),
+      parseInt(hex.slice(5, 7), 16),
+    ]);
+    const segs = stops.length - 1;
+    const pos = clampedT * segs;
+    const idx = Math.min(segs - 1, Math.floor(pos));
+    const frac = pos - idx;
+    const c1 = stops[idx];
+    const c2 = stops[idx + 1];
+    const r = Math.round(c1[0] + (c2[0] - c1[0]) * frac);
+    const g = Math.round(c1[1] + (c2[1] - c1[1]) * frac);
+    const b = Math.round(c1[2] + (c2[2] - c1[2]) * frac);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  // Draw layers from largest (outermost) to smallest (innermost)
+  for (let k = 0; k < numLayers; k++) {
+    const layerFrac = k / (numLayers - 1);
+    const radius = maxRadius * (1 - layerFrac * 0.88);
+
+    const fillColor = getLayerColor(layerFrac);
+
+    ctx.fillStyle = fillColor;
+
+    // Draw soft subtle layer shadow for 3D depth elevation
+    ctx.shadowColor = dark ? "rgba(0, 0, 0, 0.45)" : "rgba(0, 0, 0, 0.07)";
+    ctx.shadowBlur = 28 * (1 - layerFrac * 0.4);
+    ctx.shadowOffsetX = -8;
+    ctx.shadowOffsetY = 10;
+
+    ctx.beginPath();
+    
+    // Sample points along arc to form an ultra-smooth organic contour
+    const numPoints = 50;
+    const points: [number, number][] = [];
+
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 1.35 + Math.PI * 0.45;
+      const nScale = 1.1;
+      const nx = Math.cos(angle) * nScale + seedOffset + k * 0.12;
+      const ny = Math.sin(angle) * nScale + seedOffset + k * 0.12;
+      const nVal = noise2D(nx, ny);
+
+      const rOffset = radius + nVal * (maxRadius * 0.075);
+      const px = originX + Math.cos(angle) * rOffset;
+      const py = originY + Math.sin(angle) * rOffset;
+      points.push([px, py]);
+    }
+
+    // Connect points using smooth quadratic bezier interpolation
+    ctx.moveTo(w * 2, -h * 2);
+    ctx.lineTo(points[0][0], points[0][1]);
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const midX = (p0[0] + p1[0]) / 2;
+      const midY = (p0[1] + p1[1]) / 2;
+      ctx.quadraticCurveTo(p0[0], p0[1], midX, midY);
+    }
+    const lastP = points[points.length - 1];
+    ctx.lineTo(lastP[0], lastP[1]);
+
+    ctx.lineTo(w * 2, h * 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/** Legacy aliases for backwards compatibility */
+const drawTokyo = drawPenrose;
+const drawRome = drawQuantum;
 
 /* ---------- public API ---------- */
 
@@ -1353,6 +1599,7 @@ const RENDERERS: Record<
     tone: Tone,
   ) => void
 > = {
+  topography: drawTopography,
   flow: drawFlow,
   cosmic: drawCosmic,
   gradient: drawGradient,
@@ -1366,6 +1613,8 @@ const RENDERERS: Record<
   julia: drawJulia,
   lorenz: drawLorenz,
   flora: drawFlora,
+  penrose: drawPenrose,
+  quantum: drawQuantum,
   tokyo: drawTokyo,
   rome: drawRome,
 };

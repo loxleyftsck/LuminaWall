@@ -25,6 +25,8 @@ export const viewport: Viewport = {
   themeColor: "#07090d",
 };
 
+import { LanguageProvider } from "@/lib/i18n";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -33,12 +35,14 @@ export default function RootLayout({
       <body
         className={`${instrumentSerif.variable} ${manrope.variable} font-body antialiased`}
       >
-        {/* Fixed aurora ambiance behind all content */}
-        <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="animate-drift absolute -top-1/4 -left-1/4 h-[70vmax] w-[70vmax] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.10),transparent_60%)]" />
-          <div className="animate-drift-slow absolute -right-1/4 -bottom-1/4 h-[70vmax] w-[70vmax] rounded-full bg-[radial-gradient(circle,rgba(196,181,253,0.10),transparent_60%)]" />
-        </div>
-        {children}
+        <LanguageProvider>
+          {/* Fixed aurora ambiance behind all content */}
+          <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+            <div className="animate-drift absolute -top-1/4 -left-1/4 h-[70vmax] w-[70vmax] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.10),transparent_60%)]" />
+            <div className="animate-drift-slow absolute -right-1/4 -bottom-1/4 h-[70vmax] w-[70vmax] rounded-full bg-[radial-gradient(circle,rgba(196,181,253,0.10),transparent_60%)]" />
+          </div>
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

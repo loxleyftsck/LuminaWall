@@ -2,16 +2,23 @@
 
 import { motion } from "framer-motion";
 import { Check, Crown } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
-const PRO_FEATURES = [
-  "8K & custom resolutions",
-  "Custom color palettes",
-  "Batch export (10 at once)",
-  "Ad-free experience",
-];
-
-/** Premium tier placeholder — wire up to payments when ready. */
 export default function PremiumCard() {
+  const { lang, t } = useLanguage();
+
+  const proFeatures = lang === "id" ? [
+    "Ekspor 8K & resolusi kustom",
+    "Palet warna tak terbatas",
+    "Ekspor batch (10 sekaligus)",
+    "Bebas iklan sepenuhnya",
+  ] : [
+    "8K & custom resolutions",
+    "Custom color palettes",
+    "Batch export (10 at once)",
+    "Ad-free experience",
+  ];
+
   return (
     <div className="relative overflow-hidden rounded-3xl p-px">
       {/* Gradient border */}
@@ -27,7 +34,7 @@ export default function PremiumCard() {
           </h2>
         </div>
         <ul className="mt-4 space-y-2.5">
-          {PRO_FEATURES.map((f) => (
+          {proFeatures.map((f) => (
             <li key={f} className="flex items-center gap-2.5 text-sm text-dim">
               <Check size={15} className="shrink-0 text-lumen-a" />
               {f}
@@ -37,13 +44,13 @@ export default function PremiumCard() {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => alert("Pro is coming soon — thanks for your interest!")}
+          onClick={() => alert(lang === "id" ? "Pro akan segera hadir — terima kasih atas minat Anda!" : "Pro is coming soon — thanks for your interest!")}
           className="mt-5 w-full rounded-2xl bg-[linear-gradient(120deg,#7dd3fc,#c4b5fd)] px-5 py-3 text-sm font-semibold text-abyss"
         >
-          Join the waitlist
+          {lang === "id" ? "Gabung Daftar Tunggu" : "Join the waitlist"}
         </motion.button>
         <p className="mt-2.5 text-center text-[11px] text-faint">
-          Free forever for standard resolutions.
+          {lang === "id" ? "Gratis selamanya untuk resolusi standar." : "Free forever for standard resolutions."}
         </p>
       </div>
     </div>

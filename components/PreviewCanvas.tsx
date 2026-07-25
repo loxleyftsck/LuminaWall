@@ -40,8 +40,11 @@ function Screen({
  * WallpaperStudio's render effect redraws after every resolution
  * change. Frames are CSS-only, so downloads stay frameless.
  */
+import { useLanguage } from "@/lib/i18n";
+
 const PreviewCanvas = forwardRef<HTMLCanvasElement, PreviewCanvasProps>(
   function PreviewCanvas({ resolution, version }, ref) {
+    const { t } = useLanguage();
     const [scope, animate] = useAnimate();
     const reduceMotion = useReducedMotion();
 
@@ -57,24 +60,78 @@ const PreviewCanvas = forwardRef<HTMLCanvasElement, PreviewCanvasProps>(
     const bezel =
       "border-[#1c1e24] bg-[#1c1e24] shadow-[0_40px_80px_-40px_rgba(0,0,0,0.9),inset_0_0_2px_rgba(255,255,255,0.25)]";
 
+    const isMobilePhone = [
+      "iphone",
+      "fhd_plus",
+      "one_five_k",
+      "qhd_plus",
+      "mobile_4k",
+    ].includes(resolution.id);
+
     return (
-      <figure className="m-0">
+      <figure className="m-0 flex flex-col items-center">
         <div ref={scope} className="flex flex-col items-center">
-          {resolution.id === "iphone" && (
-            /* ---- Phone: bezel, dynamic island, side button ---- */
-            <div className={`relative rounded-[2.6rem] border-[10px] ${bezel}`}>
+          {isMobilePhone && (
+            /* ---- Smartphone frame (iPhone, FHD+, 1.5K, QHD+, Mobile 4K) ---- */
+            <div
+              className={`relative ${
+                resolution.id === "qhd_plus"
+                  ? "rounded-[1.8rem] border-[8px]" // Galaxy S24 Ultra sharp-flat sleek bezel
+                  : resolution.id === "mobile_4k"
+                  ? "rounded-[1.5rem] border-[9px]" // Sony Xperia 21:9 tall frame
+                  : "rounded-[2.6rem] border-[10px]" // Standard curved phone frame
+              } ${bezel}`}
+            >
+              {/* Top Notch / Punch Hole / Camera Bar Cutouts */}
+              {resolution.id === "iphone" && (
+                /* Dynamic Island */
+                <div
+                  aria-hidden
+                  className="absolute top-2.5 left-1/2 z-10 h-4 w-20 -translate-x-1/2 rounded-full bg-black/95 shadow-sm"
+                />
+              )}
+
+              {(resolution.id === "fhd_plus" ||
+                resolution.id === "one_five_k" ||
+                resolution.id === "qhd_plus") && (
+                /* Android Punch-hole Camera (Galaxy S24 / Xiaomi 14T / OnePlus 12) */
+                <div
+                  aria-hidden
+                  className="absolute top-2.5 left-1/2 z-10 h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-black/95 ring-1 ring-white/10"
+                />
+              )}
+
+              {resolution.id === "mobile_4k" && (
+                /* Sony Xperia bezel camera & ear speaker strip */
+                <div
+                  aria-hidden
+                  className="absolute top-1.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2"
+                >
+                  <div className="h-1.5 w-8 rounded-full bg-[#2a2d35]" />
+                  <div className="h-2 w-2 rounded-full bg-black/95 ring-1 ring-white/10" />
+                </div>
+              )}
+
+              {/* Side Buttons */}
               <div
                 aria-hidden
-                className="absolute top-2.5 left-1/2 z-10 h-5 w-20 -translate-x-1/2 rounded-full bg-black/90"
+                className="absolute top-24 -right-[12px] h-12 w-[3px] rounded-r bg-[#2a2d35]"
               />
               <div
                 aria-hidden
-                className="absolute top-24 -right-[13px] h-14 w-[3px] rounded-r bg-[#2a2d35]"
+                className="absolute top-40 -right-[12px] h-8 w-[3px] rounded-r bg-[#2a2d35]"
               />
+
               <Screen
                 canvasRef={ref}
                 resolution={resolution}
-                className="block h-auto max-h-[62vh] w-auto max-w-full rounded-[1.9rem]"
+                className={`block h-auto max-h-[62vh] w-auto max-w-full ${
+                  resolution.id === "qhd_plus"
+                    ? "rounded-[1.3rem]"
+                    : resolution.id === "mobile_4k"
+                    ? "rounded-[1.1rem]"
+                    : "rounded-[1.9rem]"
+                }`}
               />
             </div>
           )}
@@ -137,9 +194,22 @@ const PreviewCanvas = forwardRef<HTMLCanvasElement, PreviewCanvasProps>(
             </div>
           )}
         </div>
-        <figcaption className="mt-4 flex items-center justify-center gap-2 text-[11px] tracking-[0.18em] text-faint uppercase">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-lumen-a" />
-          {resolution.label} · {resolution.width} × {resolution.height} px
+
+        <figcaption className="mt-5 flex flex-col items-center gap-1 text-center">
+          <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] text-faint uppercase font-semibold">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-lumen-a" />
+            {resolution.label} · {resolution.width} × {resolution.height} px
+          </div>
+          {resolution.deviceRef && (
+            <p className="text-xs text-mist/80 font-medium">
+              {t("deviceReference")}: <span className="text-lumen font-semibold">{resolution.deviceRef}</span>
+              {resolution.ppi && (
+                <span className="ml-2 rounded-md bg-white/10 px-2 py-0.5 text-[10px] text-dim">
+                  {resolution.ppi} ({resolution.panelTech})
+                </span>
+              )}
+            </p>
+          )}
         </figcaption>
       </figure>
     );

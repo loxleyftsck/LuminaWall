@@ -1,12 +1,14 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { ExternalLink, Keyboard, Lamp, Monitor } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
+import { useLanguage } from "@/lib/i18n";
 
 interface AffiliateItem {
   name: string;
   blurb: string;
   icon: ReactNode;
-  /** Replace with real affiliate URLs when partnerships land. */
   href: string;
 }
 
@@ -33,12 +35,13 @@ const ITEMS: AffiliateItem[] = [
 
 /** Affiliate recommendations placeholder (monetization-ready). */
 export default function AffiliateSection() {
+  const { t } = useLanguage();
+
   return (
     <GlassCard className="p-6">
-      <h2 className="font-display text-xl italic">Desk Setup Recommendations</h2>
+      <h2 className="font-display text-xl italic">{t("affiliateTitle")}</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-dim">
-        Gear that pairs with your new wallpaper. Curated picks — affiliate
-        links coming soon.
+        {t("affiliateDesc")}
       </p>
       <ul className="mt-4 space-y-2">
         {ITEMS.map((item) => (
