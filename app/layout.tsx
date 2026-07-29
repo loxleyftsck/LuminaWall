@@ -1,3 +1,9 @@
+/**
+ * LuminaWall — dibuat oleh Herald Ginting
+ *
+ * Root layout: fonts, global metadata and the app-wide providers.
+ */
+
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * LuminaWall — dibuat oleh Herald Ginting
+ *
+ * Landing page: hero, the wallpaper studio, and the monetisation slots.
+ */
+
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import WallpaperStudio from "@/components/WallpaperStudio";

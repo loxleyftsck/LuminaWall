@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * LuminaWall — dibuat oleh Herald Ginting
+ */
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {

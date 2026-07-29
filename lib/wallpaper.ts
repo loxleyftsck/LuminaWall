@@ -1,4 +1,6 @@
 /**
+ * LuminaWall — dibuat oleh Herald Ginting
+ *
  * Pure client-side wallpaper rendering engine.
  * All drawing happens on an HTML5 Canvas in the browser —
  * no backend, no uploads, zero server cost.
