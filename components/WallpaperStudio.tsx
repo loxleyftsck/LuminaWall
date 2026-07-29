@@ -58,11 +58,25 @@ export default function WallpaperStudio() {
   // Mobile Bottom Sheet active tab state
   const [activeMobileTab, setActiveMobileTab] = useState<"none" | "style" | "palette" | "resolution">("none");
 
+  const renderAnimationFrameRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!canvasRef.current) return;
-    renderWallpaper(canvasRef.current, { style, palette, resolution, tone });
-    versionRef.current += 1;
-    setAnimVersion(versionRef.current);
+    if (renderAnimationFrameRef.current) {
+      cancelAnimationFrame(renderAnimationFrameRef.current);
+    }
+    renderAnimationFrameRef.current = requestAnimationFrame(() => {
+      if (canvasRef.current) {
+        renderWallpaper(canvasRef.current, { style, palette, resolution, tone, seed });
+        versionRef.current += 1;
+        setAnimVersion(versionRef.current);
+      }
+    });
+    return () => {
+      if (renderAnimationFrameRef.current) {
+        cancelAnimationFrame(renderAnimationFrameRef.current);
+      }
+    };
   }, [style, palette, resolution, tone, seed]);
 
   const handleGenerate = () => {
@@ -152,6 +166,9 @@ export default function WallpaperStudio() {
           options={RESOLUTIONS.map((r) => {
             const icons: Record<string, ReactNode> = {
               desktop4k: <Monitor size={15} />,
+              desktop5k: <Monitor size={15} />,
+              desktop8k: <Monitor size={15} />,
+              desktop10k: <Monitor size={15} />,
               iphone: <Smartphone size={15} />,
               fhd_plus: <Smartphone size={15} />,
               one_five_k: <Smartphone size={15} />,
@@ -339,6 +356,9 @@ export default function WallpaperStudio() {
                     options={RESOLUTIONS.map((r) => {
                       const icons: Record<string, ReactNode> = {
                         desktop4k: <Monitor size={15} />,
+                        desktop5k: <Monitor size={15} />,
+                        desktop8k: <Monitor size={15} />,
+                        desktop10k: <Monitor size={15} />,
                         iphone: <Smartphone size={15} />,
                         fhd_plus: <Smartphone size={15} />,
                         one_five_k: <Smartphone size={15} />,

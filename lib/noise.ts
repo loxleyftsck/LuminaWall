@@ -43,13 +43,13 @@ export interface Noise2D {
  * table (Fisher–Yates), so every wallpaper generation gets a fresh,
  * non-repeating field.
  */
-export function createNoise2D(): Noise2D {
+export function createNoise2D(randomFn: () => number = Math.random): Noise2D {
   // Doubled 256-entry permutation table avoids index wrapping checks.
   const perm = new Uint8Array(512);
   const p = new Uint8Array(256);
   for (let i = 0; i < 256; i++) p[i] = i;
   for (let i = 255; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(randomFn() * (i + 1));
     [p[i], p[j]] = [p[j], p[i]];
   }
   for (let i = 0; i < 512; i++) perm[i] = p[i & 255];

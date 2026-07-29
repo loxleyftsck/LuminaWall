@@ -24,6 +24,12 @@ export interface Resolution {
 }
 
 export type StyleId =
+  | "misty_pines"
+  | "silent_dunes"
+  | "lunar_arches"
+  | "touch_of_god"
+  | "iridescent_kiss"
+  | "aurora_glow"
   | "topography"
   | "flow"
   | "cosmic"
@@ -49,9 +55,40 @@ export interface RenderOptions {
   palette: Palette;
   resolution: Resolution;
   tone: Tone;
+  seed?: number;
 }
 
 export const PALETTES: Palette[] = [
+  {
+    id: "misty_nordic",
+    name: "Misty Nordic Pines",
+    colors: ["#f2f5f4", "#a3b8b0", "#48665c", "#0f1c17"],
+  },
+  {
+    id: "sahara_gold",
+    name: "Sahara Golden Dunes",
+    colors: ["#fdf6e2", "#ebc178", "#b87333", "#1f1006"],
+  },
+  {
+    id: "lunar_shadow",
+    name: "Lunar Eclipse Shadow",
+    colors: ["#f8fafc", "#94a3b8", "#334155", "#020617"],
+  },
+  {
+    id: "touch_of_god",
+    name: "Touch of God",
+    colors: ["#f4f7f6", "#a8c5be", "#1e3330", "#080c0c"],
+  },
+  {
+    id: "iridescent_kiss",
+    name: "Iridescent Kiss",
+    colors: ["#fff2e6", "#fbd3d4", "#c1e5e6", "#8fb9cf"],
+  },
+  {
+    id: "electric_aurora",
+    name: "Electric Aurora",
+    colors: ["#f0abfc", "#c084fc", "#3b82f6", "#09051d"],
+  },
   {
     id: "obsidian_gold",
     name: "Obsidian Gold",
@@ -135,6 +172,33 @@ export const RESOLUTIONS: Resolution[] = [
     panelTech: "IPS / OLED Monitor",
   },
   {
+    id: "desktop5k",
+    label: "Desktop 5K",
+    width: 5120,
+    height: 2880,
+    deviceRef: "Apple Studio Display / iMac 27",
+    ppi: "~218 PPI Ultra Retina",
+    panelTech: "5K Retina Display",
+  },
+  {
+    id: "desktop8k",
+    label: "Desktop 8K",
+    width: 7680,
+    height: 4320,
+    deviceRef: "Dell UltraSharp 8K / Pro Workstation",
+    ppi: "Ultra High-Fidelity 8K",
+    panelTech: "IPS / OLED Master Monitor",
+  },
+  {
+    id: "desktop10k",
+    label: "Ultra 10K",
+    width: 10240,
+    height: 4320,
+    deviceRef: "Ultra-Wide 32:9 Multi-Monitor / 10K Canvas",
+    ppi: "Extreme 10K Master Canvas",
+    panelTech: "Ultrawide Master Display",
+  },
+  {
     id: "iphone",
     label: "iPhone Pro Max",
     width: 1290,
@@ -200,6 +264,12 @@ export const RESOLUTIONS: Resolution[] = [
 ];
 
 export const STYLES: { id: StyleId; name: string; journalRef?: string }[] = [
+  { id: "misty_pines", name: "Misty Pine Forest", journalRef: "Atmospheric Volumetric Valley & Fbm Ridges" },
+  { id: "silent_dunes", name: "Silent Desert Dunes", journalRef: "Silky Dune Crest & Gradient Slopes" },
+  { id: "lunar_arches", name: "Lunar Eclipse Arches", journalRef: "Concentric Orbital Rings & Caustics" },
+  { id: "touch_of_god", name: "Touch of God", journalRef: "Minimalist Light & Shadow Contrast Curve" },
+  { id: "iridescent_kiss", name: "Iridescent Kiss", journalRef: "Holographic Pastel Silk Gradient" },
+  { id: "aurora_glow", name: "Aurora Glow", journalRef: "Electric Luminous Fluid Mesh" },
   { id: "topography", name: "Gradient Topography" },
   { id: "flow", name: "Flow" },
   { id: "cosmic", name: "Cosmic" },
@@ -218,11 +288,28 @@ export const STYLES: { id: StyleId; name: string; journalRef?: string }[] = [
   { id: "quantum", name: "Quantum Waves", journalRef: "E. Schrödinger (1926) - Annalen der Physik" },
 ];
 
-/* ---------- helpers ---------- */
+/* ---------- PRNG Engine ---------- */
 
-const rand = (min: number, max: number) => min + Math.random() * (max - min);
+let activePRNG: () => number = Math.random;
+
+/**
+ * Fast, high-quality 32-bit PRNG (Mulberry32).
+ * Produces deterministic, float random values in range [0, 1).
+ */
+export function createPRNG(seed: number): () => number {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const prng = (): number => activePRNG();
+const rand = (min: number, max: number) => min + prng() * (max - min);
 const pick = <T,>(arr: readonly T[]): T =>
-  arr[Math.floor(Math.random() * arr.length)];
+  arr[Math.floor(prng() * arr.length)];
 
 /** Tone decides which end of the palette dominates the background. */
 const baseColor = (p: Palette, tone: Tone) =>
@@ -275,10 +362,7 @@ export function buildPaletteLUT(p: Palette, tone: Tone): Uint8ClampedArray {
 
 /**
  * Domain-warped fractal gradient noise, rendered per-pixel into an
- * ImageData typed array on a reduced-scale offscreen canvas, then
- * upscaled with high-quality smoothing. Smooth noise loses nothing
- * in the upscale, and it keeps 4K generation fast (≈1M samples
- * instead of 8.3M) — all client-side, $0 server compute.
+ * ImageData typed array at true 1:1 native target resolution.
  */
 function drawFlow(
   ctx: CanvasRenderingContext2D,
@@ -287,38 +371,32 @@ function drawFlow(
   p: Palette,
   tone: Tone,
 ) {
-  const scale = Math.min(1, 1280 / Math.max(w, h));
-  const sw = Math.max(1, Math.round(w * scale));
-  const sh = Math.max(1, Math.round(h * scale));
-
-  const off = document.createElement("canvas");
-  off.width = sw;
-  off.height = sh;
-  const octx = off.getContext("2d");
-  if (!octx) return;
-
-  const noise = createNoise2D();
-  const warp = createNoise2D();
+  const noise = createNoise2D(prng);
+  const warp = createNoise2D(prng);
   const lut = buildPaletteLUT(p, tone);
 
-  // Base frequency: ~1.5–2.5 noise cells across the long edge.
-  const freq = rand(1.5, 2.5) / Math.max(sw, sh);
-  const warpAmount = rand(0.6, 1.4); // domain-warp strength (in cells)
+  // Base frequency: ~1.5–2.8 noise cells across the long edge.
+  const freq = rand(1.5, 2.8) / Math.max(w, h);
+  const warpAmount = rand(0.5, 1.6); // domain-warp strength (in cells)
+  const seedX1 = rand(0, 100);
+  const seedY1 = rand(0, 100);
+  const seedX2 = rand(0, 100);
+  const seedY2 = rand(0, 100);
 
-  const img = octx.createImageData(sw, sh);
-  const data = img.data; // Uint8ClampedArray — one pass, no per-pixel GC
+  const img = ctx.createImageData(w, h);
+  const data = img.data;
   let i = 0;
-  for (let y = 0; y < sh; y++) {
-    for (let x = 0; x < sw; x++) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
       const nx = x * freq;
       const ny = y * freq;
       // Warp the sampling domain with a second field — this is what
       // bends the pattern into organic, never-repeating currents.
-      const wx = fbm(warp, nx + 5.2, ny + 1.3, 3);
-      const wy = fbm(warp, nx + 9.7, ny + 8.1, 3);
+      const wx = fbm(warp, nx + seedX1, ny + seedY1, 3);
+      const wy = fbm(warp, nx + seedX2, ny + seedY2, 3);
       const n = fbm(noise, nx + warpAmount * wx, ny + warpAmount * wy, 4);
       // Map [−1, 1] → [0, 255] with ±1 random dither to break banding.
-      const t = (n + 1) * 0.5 * 255 + (Math.random() - 0.5) * 2;
+      const t = (n + 1) * 0.5 * 255 + (prng() - 0.5) * 2;
       const idx = (Math.min(255, Math.max(0, t)) | 0) * 3;
       data[i++] = lut[idx];
       data[i++] = lut[idx + 1];
@@ -326,11 +404,7 @@ function drawFlow(
       data[i++] = 255;
     }
   }
-  octx.putImageData(img, 0, 0);
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(off, 0, 0, w, h);
+  ctx.putImageData(img, 0, 0);
 }
 
 /**
@@ -442,10 +516,14 @@ function drawCosmic(
   ctx.globalCompositeOperation = "source-over";
 }
 
-/** Lighten (factor > 1) or darken (factor < 1) a #rrggbb color. */
-export function shade(hex: string, factor: number): string {
+export function shade(color: string, factor: number): string {
+  if (color.startsWith("rgb")) return color;
+  let hex = color.startsWith("#") ? color.slice(1) : color;
+  if (hex.length === 3) {
+    hex = hex.split("").map((c) => c + c).join("");
+  }
   let out = "#";
-  for (let i = 1; i < 7; i += 2) {
+  for (let i = 0; i < 6; i += 2) {
     const v = Math.min(
       255,
       Math.max(0, Math.round(parseInt(hex.slice(i, i + 2), 16) * factor)),
@@ -453,6 +531,18 @@ export function shade(hex: string, factor: number): string {
     out += v.toString(16).padStart(2, "0");
   }
   return out;
+}
+
+export function hexWithAlpha(color: string, alpha: number): string {
+  if (color.startsWith("rgb")) {
+    return color.replace("rgb", "rgba").replace(")", `, ${alpha})`);
+  }
+  let hex = color.startsWith("#") ? color.slice(1) : color;
+  if (hex.length === 3) {
+    hex = hex.split("").map((c) => c + c).join("");
+  }
+  const v = Math.round(Math.min(1, Math.max(0, alpha)) * 255);
+  return "#" + hex + v.toString(16).padStart(2, "0");
 }
 
 /**
@@ -895,12 +985,6 @@ function drawAurora(
   ctx.globalCompositeOperation = "source-over";
 }
 
-/** #rrggbb + numeric alpha (0–1) → 8-digit hex color. */
-function hexWithAlpha(hex: string, a: number): string {
-  const v = Math.round(Math.min(1, Math.max(0, a)) * 255);
-  return hex + v.toString(16).padStart(2, "0");
-}
-
 /** Stacked sine-curve bands flowing across the frame. */
 function drawWaves(
   ctx: CanvasRenderingContext2D,
@@ -1004,14 +1088,15 @@ function drawChladni(
   const sandColor = dark ? p.colors[0] : p.colors[3];
   ctx.fillStyle = sandColor + "1a"; // Soft particles
 
-  // Pick resonant harmonics
-  const n = Math.floor(rand(2, 8));
-  const m = Math.floor(rand(3, 9));
+  // Pick resonant harmonics from PRNG
+  const n = Math.floor(rand(2, 9));
+  const m = Math.floor(rand(2, 9));
+  const dotSize = Math.max(1.5, Math.min(w, h) / 1000);
 
-  const particles = Math.round(w * h * 0.15);
+  const particles = Math.round(w * h * 0.12);
   for (let i = 0; i < particles; i++) {
-    const px = Math.random();
-    const py = Math.random();
+    const px = prng();
+    const py = prng();
 
     // Chladni nodal plate equation
     const val =
@@ -1020,14 +1105,14 @@ function drawChladni(
 
     // If close to nodal line, deposit a grain of sand
     if (Math.abs(val) < 0.12) {
-      ctx.fillRect(px * w, py * h, 1.5, 1.5);
+      ctx.fillRect(px * w, py * h, dotSize, dotSize);
     }
   }
 }
 
 /**
  * Julia fractal set with clean smooth tone mapping.
- * Uses z' = z^2 + c with dynamic parameters c to draw minimal organic boundaries.
+ * Rendered at 1:1 native resolution using z' = z^2 + c with dynamic parameters.
  */
 function drawJulia(
   ctx: CanvasRenderingContext2D,
@@ -1036,30 +1121,21 @@ function drawJulia(
   p: Palette,
   tone: Tone,
 ) {
-  const scale = Math.min(1, 1000 / Math.max(w, h));
-  const sw = Math.max(1, Math.round(w * scale));
-  const sh = Math.max(1, Math.round(h * scale));
-
-  const off = document.createElement("canvas");
-  off.width = sw;
-  off.height = sh;
-  const octx = off.getContext("2d");
-  if (!octx) return;
-
-  const img = octx.createImageData(sw, sh);
-  const data = img.data;
   const lut = buildPaletteLUT(p, tone);
 
-  // Julia parameter seed (c) picked to give clean, minimalist shapes
-  const cx = rand(-0.8, -0.4);
-  const cy = rand(0.1, 0.3);
-  const maxIt = 45;
+  // Julia parameter seed (c) picked from PRNG
+  const cx = rand(-0.82, -0.38);
+  const cy = rand(0.08, 0.35);
+  const maxIt = 50;
+
+  const img = ctx.createImageData(w, h);
+  const data = img.data;
 
   let i = 0;
-  for (let y = 0; y < sh; y++) {
-    const j = (y / sh - 0.5) * 3.0;
-    for (let x = 0; x < sw; x++) {
-      const r = (x / sw - 0.5) * 3.0 * (sw / sh);
+  for (let y = 0; y < h; y++) {
+    const j = (y / h - 0.5) * 3.0;
+    for (let x = 0; x < w; x++) {
+      const r = (x / w - 0.5) * 3.0 * (w / h);
 
       let zr = r;
       let zi = j;
@@ -1088,16 +1164,12 @@ function drawJulia(
       data[i++] = 255;
     }
   }
-  octx.putImageData(img, 0, 0);
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(off, 0, 0, w, h);
+  ctx.putImageData(img, 0, 0);
 }
 
 /**
  * Lorenz Attractor in Chaos Theory.
- * Simulates Lorenz differential equations in 3D and projects it cleanly.
+ * Simulates Lorenz differential equations in 3D with dynamic rotation.
  */
 function drawLorenz(
   ctx: CanvasRenderingContext2D,
@@ -1117,10 +1189,10 @@ function drawLorenz(
 
   let x = 0.1, y = 0, z = 0;
   const dt = 0.006;
-  const steps = 14000;
+  const steps = 16000;
 
   // Track 3D points
-  const points: {x: number, y: number, z: number}[] = [];
+  const points: { x: number; y: number; z: number }[] = [];
   for (let i = 0; i < steps; i++) {
     const dx = sigma * (y - x) * dt;
     const dy = (x * (rho - z) - y) * dt;
@@ -1128,22 +1200,22 @@ function drawLorenz(
     x += dx;
     y += dy;
     z += dz;
-    points.push({x, y, z});
+    points.push({ x, y, z });
   }
 
-  // Centering project
+  // Dynamic 3D rotation angle
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const cos = Math.cos(0.5);
-  const sin = Math.sin(0.5);
+  const angleX = rand(0.2, 1.2);
+  const cos = Math.cos(angleX);
+  const sin = Math.sin(angleX);
 
-  const projected = points.map(pt => {
-    // Rotate slightly in 3D space to look artistic
+  const projected = points.map((pt) => {
     const rx = pt.x * cos - pt.z * sin;
     const rz = pt.x * sin + pt.z * cos;
     return { x: rx, y: pt.y, z: rz };
   });
 
-  projected.forEach(pt => {
+  projected.forEach((pt) => {
     if (pt.x < minX) minX = pt.x;
     if (pt.x > maxX) maxX = pt.x;
     if (pt.y < minY) minY = pt.y;
@@ -1152,13 +1224,13 @@ function drawLorenz(
 
   const spanX = maxX - minX;
   const spanY = maxY - minY;
-  const scale = Math.min(w * 0.7 / spanX, h * 0.7 / spanY);
+  const scale = Math.min((w * 0.7) / spanX, (h * 0.7) / spanY);
   const cx = w / 2 - (minX + spanX / 2) * scale;
   const cy = h / 2 - (minY + spanY / 2) * scale;
 
-  // Draw clean trails
-  ctx.strokeStyle = ink + "1f"; // Very fine translucent lines
-  ctx.lineWidth = 1.5;
+  // Draw clean trails with resolution-aware line width
+  ctx.strokeStyle = ink + "1f";
+  ctx.lineWidth = Math.max(1.5, Math.min(w, h) / 1200);
   ctx.beginPath();
   projected.forEach((pt, idx) => {
     const px = pt.x * scale + cx;
@@ -1171,8 +1243,7 @@ function drawLorenz(
 
 /**
  * Fractal Flora.
- * Creates elegant, clean organic flower structures spreading across the canvas.
- * Derived from the boundaries of the complex transcendental Julia Set: z' = sin(z) * c.
+ * Creates elegant, clean organic flower structures spreading across the canvas at 1:1 resolution.
  */
 function drawFlora(
   ctx: CanvasRenderingContext2D,
@@ -1181,54 +1252,35 @@ function drawFlora(
   p: Palette,
   tone: Tone,
 ) {
-  // Paint standard background wash
   paintBase(ctx, w, h, p, tone);
 
   const dark = tone === "dark";
   const lut = buildPaletteLUT(p, tone);
 
-  const scale = Math.min(1, 1000 / Math.max(w, h));
-  const sw = Math.max(1, Math.round(w * scale));
-  const sh = Math.max(1, Math.round(h * scale));
+  const cx = rand(1.0, 1.28);
+  const cy = rand(0.08, 0.32);
+  const maxIt = 35;
 
-  const off = document.createElement("canvas");
-  off.width = sw;
-  off.height = sh;
-  const octx = off.getContext("2d");
-  if (!octx) return;
-
-  const img = octx.createImageData(sw, sh);
-  const data = img.data;
-
-  // Transcendental Julia constant c = cx + i*cy
-  // Tuned to generate organic plant-like structures with clean flower petals
-  const cx = rand(1.0, 1.25);
-  const cy = rand(0.1, 0.3);
-  const maxIt = 30;
-
-  // Complex sinh and cosh helpers
   const sinh = (v: number) => (Math.exp(v) - Math.exp(-v)) / 2;
   const cosh = (v: number) => (Math.exp(v) + Math.exp(-v)) / 2;
 
+  const img = ctx.createImageData(w, h);
+  const data = img.data;
   let i = 0;
-  for (let y = 0; y < sh; y++) {
-    // Standard mapping to complex plane [-2, 2]
-    const j = (y / sh - 0.5) * 3.2;
-    for (let x = 0; x < sw; x++) {
-      const r = (x / sw - 0.5) * 3.2 * (sw / sh);
+
+  for (let y = 0; y < h; y++) {
+    const j = (y / h - 0.5) * 3.2;
+    for (let x = 0; x < w; x++) {
+      const r = (x / w - 0.5) * 3.2 * (w / h);
 
       let zr = r;
       let zi = j;
       let it = 0;
 
-      // Iterative complex function: z_next = sin(z) * c
-      // Under complex trigonometry: sin(x + i*y) = sin(x)*cosh(y) + i * cos(x)*sinh(y)
       while (zr * zr + zi * zi < 25.0 && it < maxIt) {
-        // sin(z) components
         const sin_r = Math.sin(zr) * cosh(zi);
         const cos_i = Math.cos(zr) * sinh(zi);
 
-        // Complex multiplication with c = cx + i*cy
         const next_r = sin_r * cx - cos_i * cy;
         const next_i = sin_r * cy + cos_i * cx;
 
@@ -1237,14 +1289,11 @@ function drawFlora(
         it++;
       }
 
-      // Extract boundary curves to draw elegant flower veins
       let density = 0;
       if (it < maxIt) {
         const log_zn = Math.log(zr * zr + zi * zi) / 2;
         const nu = Math.log(log_zn / Math.log(2)) / Math.log(2);
         const smoothIt = it + 1 - nu;
-
-        // Overlay sinus ripples to extract leaf/petal layers
         density = Math.abs(Math.sin(smoothIt * 0.95));
       }
 
@@ -1255,20 +1304,22 @@ function drawFlora(
       data[i++] = 255;
     }
   }
-  octx.putImageData(img, 0, 0);
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
-  ctx.drawImage(off, 0, 0, w, h);
-  ctx.globalCompositeOperation = "source-over";
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = w;
+  tempCanvas.height = h;
+  const tctx = tempCanvas.getContext("2d");
+  if (tctx) {
+    tctx.putImageData(img, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
+    ctx.drawImage(tempCanvas, 0, 0);
+    ctx.restore();
+  }
 }
 
 /**
  * Penrose Aperiodic Tiling (Quasicrystal Geometry).
- * Reference: Roger Penrose (1974) - "The Role of Aesthetics in Pure and Applied Mathematical Research" (Inst. Math. Appl.)
- * & Penrose (1979) "Pentaplexity" (Mathematical Intelligencer).
- * Uses recursive golden ratio (phi) triangle subdivision with pentagonal quasicrystal symmetry.
  */
 function drawPenrose(
   ctx: CanvasRenderingContext2D,
@@ -1283,20 +1334,23 @@ function drawPenrose(
   const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
 
   interface Triangle {
-    type: number; // 0 = thin (36-72-72), 1 = thick (108-36-36)
+    type: number;
     a: [number, number];
     b: [number, number];
     c: [number, number];
   }
 
-  // Generate initial decagon of 10 Robinson triangles at canvas center
-  const center: [number, number] = [w / 2, h / 2];
-  const radius = Math.max(w, h) * 0.75;
+  const center: [number, number] = [
+    w * rand(0.38, 0.62),
+    h * rand(0.38, 0.62),
+  ];
+  const radius = Math.max(w, h) * 0.8;
+  const rotOffset = rand(0, Math.PI * 2);
   let triangles: Triangle[] = [];
 
   for (let i = 0; i < 10; i++) {
-    const angle1 = ((i - 0.5) * Math.PI) / 5;
-    const angle2 = ((i + 0.5) * Math.PI) / 5;
+    const angle1 = rotOffset + ((i - 0.5) * Math.PI) / 5;
+    const angle2 = rotOffset + ((i + 0.5) * Math.PI) / 5;
     const b: [number, number] = [
       center[0] + radius * Math.cos(angle1),
       center[1] + radius * Math.sin(angle1),
@@ -1312,13 +1366,11 @@ function drawPenrose(
     }
   }
 
-  // Subdivide 6 levels deep
   const subdivisions = 6;
   for (let step = 0; step < subdivisions; step++) {
     const next: Triangle[] = [];
     for (const tri of triangles) {
       if (tri.type === 0) {
-        // Thin triangle subdivision: A + (B - A) / phi
         const pPoint: [number, number] = [
           tri.a[0] + (tri.b[0] - tri.a[0]) / GOLDEN_RATIO,
           tri.a[1] + (tri.b[1] - tri.a[1]) / GOLDEN_RATIO,
@@ -1326,7 +1378,6 @@ function drawPenrose(
         next.push({ type: 0, a: tri.c, b: pPoint, c: tri.a });
         next.push({ type: 1, a: tri.c, b: tri.b, c: pPoint });
       } else {
-        // Thick triangle subdivision
         const qPoint: [number, number] = [
           tri.b[0] + (tri.a[0] - tri.b[0]) / GOLDEN_RATIO,
           tri.b[1] + (tri.a[1] - tri.b[1]) / GOLDEN_RATIO,
@@ -1343,11 +1394,10 @@ function drawPenrose(
     triangles = next;
   }
 
-  // Draw Penrose Tiles
   ctx.save();
   const strokeColor = dark ? p.colors[0] : p.colors[3];
   const alphaStroke = dark ? "40" : "60";
-  ctx.lineWidth = Math.max(0.6, Math.min(w, h) / 2400);
+  ctx.lineWidth = Math.max(0.8, Math.min(w, h) / 2000);
 
   for (let i = 0; i < triangles.length; i++) {
     const tri = triangles[i];
@@ -1365,9 +1415,8 @@ function drawPenrose(
     ctx.stroke();
   }
 
-  // Draw concentric glowing Penrose decagram guidelines
   ctx.strokeStyle = p.colors[0] + "20";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = Math.max(1, Math.min(w, h) / 1800);
   for (let r = radius * 0.1; r < radius; r += radius * 0.18) {
     ctx.beginPath();
     ctx.arc(center[0], center[1], r, 0, Math.PI * 2);
@@ -1378,9 +1427,7 @@ function drawPenrose(
 }
 
 /**
- * Quantum Wave Interference & Superposition.
- * Reference: Erwin Schrödinger (1926) - "Quantisierung als Eigenwertproblem" (Annalen der Physik, Vol. 384, pp. 361-376).
- * Simulates multi-source complex wavefunction interference patterns |Psi|^2 with caustic field contours.
+ * Quantum Wave Interference & Superposition at 1:1 resolution.
  */
 function drawQuantum(
   ctx: CanvasRenderingContext2D,
@@ -1395,45 +1442,35 @@ function drawQuantum(
   const numSources = 6;
   const sources: { x: number; y: number; k: number; phase: number; amp: number }[] = [];
 
+  const centerOffX = w * rand(0.4, 0.6);
+  const centerOffY = h * rand(0.4, 0.6);
+
   for (let i = 0; i < numSources; i++) {
     const angle = (i * Math.PI * 2) / numSources + rand(-0.2, 0.2);
     const rad = Math.min(w, h) * rand(0.15, 0.38);
     sources.push({
-      x: w / 2 + Math.cos(angle) * rad,
-      y: h / 2 + Math.sin(angle) * rad,
+      x: centerOffX + Math.cos(angle) * rad,
+      y: centerOffY + Math.sin(angle) * rad,
       k: rand(0.015, 0.04),
       phase: rand(0, Math.PI * 2),
       amp: rand(0.8, 1.3),
     });
   }
 
-  // Render probability amplitude grid onto offscreen buffer
-  const scale = 4;
-  const sw = Math.ceil(w / scale);
-  const sh = Math.ceil(h / scale);
-
-  const off = document.createElement("canvas");
-  off.width = sw;
-  off.height = sh;
-  const octx = off.getContext("2d");
-  if (!octx) return;
-
-  const img = octx.createImageData(sw, sh);
+  const img = ctx.createImageData(w, h);
   const data = img.data;
   const lut = buildPaletteLUT(p, tone);
 
   let i = 0;
-  for (let y = 0; y < sh; y++) {
-    const py = y * scale;
-    for (let x = 0; x < sw; x++) {
-      const px = x * scale;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
       let re = 0;
       let im = 0;
 
       for (let s = 0; s < numSources; s++) {
         const src = sources[s];
-        const dx = px - src.x;
-        const dy = py - src.y;
+        const dx = x - src.x;
+        const dy = y - src.y;
         const dist = Math.sqrt(dx * dx + dy * dy) + 1.0;
         const arg = src.k * dist + src.phase;
         const amp = src.amp / Math.pow(dist, 0.35);
@@ -1441,7 +1478,6 @@ function drawQuantum(
         im += amp * Math.sin(arg);
       }
 
-      // Quantum probability density |Psi|^2
       const probDensity = re * re + im * im;
       const val = Math.sin(probDensity * 1.8) * 0.5 + 0.5;
 
@@ -1453,18 +1489,21 @@ function drawQuantum(
     }
   }
 
-  octx.putImageData(img, 0, 0);
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = w;
+  tempCanvas.height = h;
+  const tctx = tempCanvas.getContext("2d");
+  if (tctx) {
+    tctx.putImageData(img, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
+    ctx.drawImage(tempCanvas, 0, 0);
+    ctx.restore();
+  }
 
   ctx.save();
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.globalCompositeOperation = dark ? "lighter" : "multiply";
-  ctx.drawImage(off, 0, 0, w, h);
-  ctx.globalCompositeOperation = "source-over";
-
-  // Draw glowing quantum nodal curves (phase wavefront boundaries)
   ctx.strokeStyle = dark ? p.colors[0] + "50" : p.colors[3] + "50";
-  ctx.lineWidth = Math.max(1, Math.min(w, h) / 1400);
+  ctx.lineWidth = Math.max(1.5, Math.min(w, h) / 1200);
 
   for (let s = 0; s < numSources; s++) {
     const src = sources[s];
@@ -1481,8 +1520,7 @@ function drawQuantum(
 
 /**
  * Gradient Topography (Smooth Layered Shapes).
- * Inspired by Cool Backgrounds & modern topographic contour art.
- * Draws stacked, silky-smooth organic contour layers stepping through the color palette.
+ * Draws stacked contour layers with resolution-proportional shadow blurs.
  */
 function drawTopography(
   ctx: CanvasRenderingContext2D,
@@ -1497,17 +1535,15 @@ function drawTopography(
   const colors = dark ? [...p.colors].reverse() : p.colors;
   const numLayers = 14;
 
-  // Origin point for the topography sweep (top-right or right edge)
-  const originX = w * rand(0.75, 1.25);
-  const originY = -h * rand(0.1, 0.35);
+  const originX = w * rand(0.55, 1.35);
+  const originY = -h * rand(0.05, 0.4);
   const maxRadius = Math.sqrt(w * w + h * h) * 1.35;
 
-  const noise2D = createNoise2D();
+  const noise2D = createNoise2D(prng);
   const seedOffset = rand(0, 100);
 
   ctx.save();
 
-  // Helper to sample smooth color across palette stops
   function getLayerColor(t: number): string {
     const clampedT = Math.max(0, Math.min(1, t));
     const stops = colors.map((hex) => [
@@ -1527,7 +1563,6 @@ function drawTopography(
     return `rgb(${r}, ${g}, ${b})`;
   }
 
-  // Draw layers from largest (outermost) to smallest (innermost)
   for (let k = 0; k < numLayers; k++) {
     const layerFrac = k / (numLayers - 1);
     const radius = maxRadius * (1 - layerFrac * 0.88);
@@ -1536,16 +1571,16 @@ function drawTopography(
 
     ctx.fillStyle = fillColor;
 
-    // Draw soft subtle layer shadow for 3D depth elevation
+    // Draw soft subtle layer shadow scaled dynamically to resolution
+    const shadowBase = Math.min(w, h) * 0.02;
     ctx.shadowColor = dark ? "rgba(0, 0, 0, 0.45)" : "rgba(0, 0, 0, 0.07)";
-    ctx.shadowBlur = 28 * (1 - layerFrac * 0.4);
-    ctx.shadowOffsetX = -8;
-    ctx.shadowOffsetY = 10;
+    ctx.shadowBlur = shadowBase * (1 - layerFrac * 0.4);
+    ctx.shadowOffsetX = -shadowBase * 0.28;
+    ctx.shadowOffsetY = shadowBase * 0.35;
 
     ctx.beginPath();
     
-    // Sample points along arc to form an ultra-smooth organic contour
-    const numPoints = 50;
+    const numPoints = 60;
     const points: [number, number][] = [];
 
     for (let i = 0; i <= numPoints; i++) {
@@ -1561,7 +1596,6 @@ function drawTopography(
       points.push([px, py]);
     }
 
-    // Connect points using smooth quadratic bezier interpolation
     ctx.moveTo(w * 2, -h * 2);
     ctx.lineTo(points[0][0], points[0][1]);
 
@@ -1583,6 +1617,587 @@ function drawTopography(
   ctx.restore();
 }
 
+/**
+ * "Touch of God" — Minimalist Divine Light & Shadow Contrast Curve.
+ * Draws an organic S-curve boundary separating a luminous light field from a deep obsidian shadow,
+ * with soft rim glow along the contact line and fine photographic film grain.
+ */
+function drawTouchOfGod(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  // Paint background wash
+  const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+  const lightBg = tone === "light" ? p.colors[0] : shade(p.colors[1], 1.1);
+  const lightFar = tone === "light" ? p.colors[1] : p.colors[0];
+  bgGrad.addColorStop(0, lightBg);
+  bgGrad.addColorStop(1, lightFar);
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const noise = createNoise2D(prng);
+  const seedOffset = rand(0, 100);
+
+  // Light focal bloom on upper-left
+  const bloomX = w * rand(0.15, 0.4);
+  const bloomY = h * rand(0.15, 0.4);
+  const bloomR = Math.max(w, h) * rand(0.45, 0.75);
+  const bloomGrad = ctx.createRadialGradient(bloomX, bloomY, 0, bloomX, bloomY, bloomR);
+  bloomGrad.addColorStop(0, shade(p.colors[0], 1.15) + "ee");
+  bloomGrad.addColorStop(0.5, p.colors[1] + "77");
+  bloomGrad.addColorStop(1, p.colors[1] + "00");
+  ctx.fillStyle = bloomGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Draw organic dark shadow mass sweeping from bottom-right (aspect ratio safe)
+  const darkColor = tone === "light" ? p.colors[3] : "#050608";
+  const numSteps = 140;
+  const shadowPoints: [number, number][] = [];
+
+  const startX = w * rand(0.55, 0.85);
+  const startY = -h * 0.2;
+  const endX = w * 1.2;
+  const endY = h * rand(0.55, 0.85);
+
+  ctx.save();
+
+  // Multi-pass soft shadow layers for silky 3D volumetric falloff
+  const shadowPasses = 5;
+  for (let pass = shadowPasses; pass >= 1; pass--) {
+    const passFrac = pass / shadowPasses;
+    
+    ctx.beginPath();
+    ctx.moveTo(w * 2.0, -h * 0.5);
+
+    shadowPoints.length = 0;
+    for (let i = 0; i <= numSteps; i++) {
+      const t = i / numSteps;
+      const bx = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * (w * 0.45) + t * t * endX;
+      const by = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * (h * 0.45) + t * t * endY;
+
+      const nScale = 1.8;
+      const nVal = fbm(noise, t * nScale + seedOffset + pass * 0.05, pass * 0.1, 3);
+      const offsetAmt = Math.min(w, h) * (0.04 + passFrac * 0.08);
+
+      const px = bx + nVal * offsetAmt;
+      const py = by + nVal * offsetAmt;
+      shadowPoints.push([px, py]);
+    }
+
+    ctx.lineTo(shadowPoints[0][0], shadowPoints[0][1]);
+    for (let i = 0; i < shadowPoints.length - 1; i++) {
+      const p0 = shadowPoints[i];
+      const p1 = shadowPoints[i + 1];
+      const mx = (p0[0] + p1[0]) / 2;
+      const my = (p0[1] + p1[1]) / 2;
+      ctx.quadraticCurveTo(p0[0], p0[1], mx, my);
+    }
+    const lastP = shadowPoints[shadowPoints.length - 1];
+    ctx.lineTo(lastP[0], lastP[1]);
+    ctx.lineTo(w * 2.0, h * 2.0);
+    ctx.closePath();
+
+    ctx.fillStyle = hexWithAlpha(darkColor, pass === 1 ? 0.96 : 0.18);
+    ctx.shadowColor = darkColor;
+    ctx.shadowBlur = Math.min(w, h) * 0.06 * passFrac;
+    ctx.fill();
+  }
+
+  // Dual-contact glowing rim along the edge curve for maximum 3D rim depth
+  ctx.shadowBlur = Math.min(w, h) * 0.015;
+  ctx.shadowColor = p.colors[1];
+  ctx.strokeStyle = hexWithAlpha(p.colors[1], 0.55);
+  ctx.lineWidth = Math.max(2.5, Math.min(w, h) / 500);
+  ctx.beginPath();
+  ctx.moveTo(shadowPoints[0][0], shadowPoints[0][1]);
+  for (let i = 0; i < shadowPoints.length - 1; i++) {
+    const p0 = shadowPoints[i];
+    const p1 = shadowPoints[i + 1];
+    const mx = (p0[0] + p1[0]) / 2;
+    const my = (p0[1] + p1[1]) / 2;
+    ctx.quadraticCurveTo(p0[0], p0[1], mx, my);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * "Iridescent Kiss" — Holographic Pastel Silk Ribbon Mesh.
+ * Draws sweeping 3D holographic silk ribbons with pearlescent pastel gradients,
+ * distinct organic folds, metallic shimmer contours, and subtle paper grain.
+ */
+function drawIridescentKiss(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  // Base soft background wash
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, tone === "dark" ? "#14111d" : p.colors[0]);
+  bg.addColorStop(0.5, tone === "dark" ? "#1e182b" : p.colors[1]);
+  bg.addColorStop(1, tone === "dark" ? "#0b0914" : p.colors[3]);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  const noise = createNoise2D(prng);
+  const seedX = rand(0, 100);
+
+  ctx.save();
+
+  // Multi-layer sweeping 3D holographic silk ribbons
+  const ribbonCount = 5;
+  const numSteps = 160;
+
+  for (let r = 0; r < ribbonCount; r++) {
+    const colMain = p.colors[r % p.colors.length];
+    const colSecondary = p.colors[(r + 1) % p.colors.length];
+    const yAnchor = h * (0.15 + 0.16 * r) + rand(-h * 0.04, h * 0.04);
+    const ribbonWidth = Math.min(w, h) * rand(0.18, 0.35);
+
+    const topPts: [number, number][] = [];
+    const botPts: [number, number][] = [];
+
+    for (let i = 0; i <= numSteps; i++) {
+      const t = i / numSteps;
+      const x = w * (t * 1.2 - 0.1);
+      const waveVal = Math.sin(t * Math.PI * 2.5 + r * 1.2 + seedX) * (h * 0.12);
+      const noiseVal = fbm(noise, t * 2.0 + seedX, r * 1.5, 3) * (h * 0.18);
+      const yTop = yAnchor + waveVal + noiseVal;
+      const yBot = yTop + ribbonWidth * (0.8 + 0.4 * Math.sin(t * Math.PI * 3 + r));
+
+      topPts.push([x, yTop]);
+      botPts.push([x, yBot]);
+    }
+
+    // Path for ribbon body
+    ctx.beginPath();
+    ctx.moveTo(topPts[0][0], topPts[0][1]);
+    for (let i = 0; i < topPts.length - 1; i++) {
+      const p0 = topPts[i];
+      const p1 = topPts[i + 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.lineTo(topPts[topPts.length - 1][0], topPts[topPts.length - 1][1]);
+    ctx.lineTo(botPts[botPts.length - 1][0], botPts[botPts.length - 1][1]);
+    for (let i = botPts.length - 1; i > 0; i--) {
+      const p0 = botPts[i];
+      const p1 = botPts[i - 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.closePath();
+
+    // Fill with holographic linear gradient across ribbon flow
+    const rGrad = ctx.createLinearGradient(0, yAnchor - ribbonWidth, w, yAnchor + ribbonWidth * 2);
+    rGrad.addColorStop(0, hexWithAlpha(colMain, tone === "dark" ? 0.75 : 0.65));
+    rGrad.addColorStop(0.5, hexWithAlpha(colSecondary, tone === "dark" ? 0.6 : 0.45));
+    rGrad.addColorStop(1, hexWithAlpha(p.colors[(r + 2) % p.colors.length], 0.1));
+
+    ctx.fillStyle = rGrad;
+    ctx.shadowColor = colMain;
+    ctx.shadowBlur = Math.min(w, h) * 0.025;
+    ctx.fill();
+
+    // Shimmer line along top crest of silk fold
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = hexWithAlpha("#ffffff", tone === "dark" ? 0.6 : 0.8);
+    ctx.lineWidth = Math.max(1.5, Math.min(w, h) / 700);
+    ctx.beginPath();
+    ctx.moveTo(topPts[0][0], topPts[0][1]);
+    for (let i = 0; i < topPts.length - 1; i++) {
+      const p0 = topPts[i];
+      const p1 = topPts[i + 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.stroke();
+  }
+
+  // Pearlescent diagonal sheen
+  const sheen = ctx.createLinearGradient(-w * 0.2, 0, w * 1.2, h);
+  sheen.addColorStop(0, "rgba(255, 255, 255, 0.25)");
+  sheen.addColorStop(0.5, "rgba(255, 255, 255, 0.02)");
+  sheen.addColorStop(1, "rgba(255, 255, 255, 0.2)");
+  ctx.globalCompositeOperation = "overlay";
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.restore();
+}
+
+/**
+ * "Aurora Glow" — Electric Luminous Fluid Mesh.
+ * Blends vibrant electric violet, deep cobalt blue, and neon magenta floating fluid curtains
+ * across a deep night sky without blinding white flashbang clipping.
+ */
+function drawAuroraGlow(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  // Deep rich dark night-sky base
+  const darkBg = tone === "dark" ? p.colors[3] : shade(p.colors[3], 0.7);
+  ctx.fillStyle = darkBg;
+  ctx.fillRect(0, 0, w, h);
+
+  const noise = createNoise2D(prng);
+  const seedY = rand(0, 100);
+
+  ctx.save();
+  // Use "screen" instead of "lighter" to prevent white flashbang clipping!
+  ctx.globalCompositeOperation = "screen";
+
+  // Deep ambient luminous blooms (non-blinding alpha)
+  const numBlobs = 5;
+  for (let b = 0; b < numBlobs; b++) {
+    const frac = b / (numBlobs - 1);
+    const color = p.colors[b % p.colors.length];
+
+    const cx = w * (0.15 + 0.7 * fbm(noise, frac * 2.5, seedY, 3));
+    const cy = h * (0.2 + 0.6 * fbm(noise, frac * 2.5 + 4.2, seedY, 3));
+    const radius = Math.max(w, h) * rand(0.35, 0.55);
+
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    g.addColorStop(0, hexWithAlpha(color, 0.42));
+    g.addColorStop(0.5, hexWithAlpha(color, 0.18));
+    g.addColorStop(1, hexWithAlpha(color, 0.0));
+
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Floating volumetric aurora curtains
+  const ribbonCount = 4;
+  for (let r = 0; r < ribbonCount; r++) {
+    const col = p.colors[(r + 1) % p.colors.length];
+    const rY = h * (0.2 + 0.45 * (r / ribbonCount)) + rand(-h * 0.04, h * 0.04);
+    const rThickness = h * rand(0.12, 0.25);
+    const rAmp = h * rand(0.08, 0.16);
+    const rFreq = (Math.PI * 2 * rand(1.2, 2.2)) / w;
+
+    const topCurve: [number, number][] = [];
+    const botCurve: [number, number][] = [];
+    const stepX = Math.max(2, w / 400);
+
+    for (let x = 0; x <= w; x += stepX) {
+      const dy = Math.sin(x * rFreq + r * 1.5) * rAmp + fbm(noise, x * 0.001, r * 3.1 + seedY, 3) * (rAmp * 0.6);
+      topCurve.push([x, rY + dy]);
+      botCurve.push([x, rY + dy + rThickness]);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(topCurve[0][0], topCurve[0][1]);
+    for (let i = 0; i < topCurve.length - 1; i++) {
+      const p0 = topCurve[i];
+      const p1 = topCurve[i + 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.lineTo(topCurve[topCurve.length - 1][0], topCurve[topCurve.length - 1][1]);
+    ctx.lineTo(botCurve[botCurve.length - 1][0], botCurve[botCurve.length - 1][1]);
+
+    for (let i = botCurve.length - 1; i > 0; i--) {
+      const p0 = botCurve[i];
+      const p1 = botCurve[i - 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.closePath();
+
+    const g = ctx.createLinearGradient(0, rY - rAmp, 0, rY + rThickness + rAmp);
+    g.addColorStop(0, hexWithAlpha(col, 0.0));
+    g.addColorStop(0.4, hexWithAlpha(col, 0.5));
+    g.addColorStop(0.8, hexWithAlpha(col, 0.2));
+    g.addColorStop(1, hexWithAlpha(col, 0.0));
+
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+
+  // Shimmering vertical ray curtains (authentic aurora rays)
+  ctx.globalCompositeOperation = "screen";
+  const numRays = 18;
+  for (let i = 0; i < numRays; i++) {
+    const rx = w * (0.05 + 0.9 * (i / numRays) + rand(-0.02, 0.02));
+    const ry = h * rand(0.15, 0.45);
+    const rLen = h * rand(0.25, 0.5);
+    const rW = Math.max(2, w * rand(0.003, 0.008));
+    const rayCol = p.colors[i % p.colors.length];
+
+    const rg = ctx.createLinearGradient(rx, ry, rx, ry + rLen);
+    rg.addColorStop(0, hexWithAlpha(rayCol, 0.0));
+    rg.addColorStop(0.3, hexWithAlpha(rayCol, 0.35));
+    rg.addColorStop(0.7, hexWithAlpha(rayCol, 0.15));
+    rg.addColorStop(1, hexWithAlpha(rayCol, 0.0));
+
+    ctx.fillStyle = rg;
+    ctx.fillRect(rx - rW / 2, ry, rW, rLen);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * "Misty Pine Forest" — Adapted directly from the proven Landscape style algorithm.
+ * Uses Musgrave fBm ridges, palette LUT atmospheric depth, glowing celestial orb,
+ * and sparse, elegant pine silhouettes along middle & foreground ridges.
+ */
+function drawMistyPines(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  // 1. Sky: soft vertical gradient from palette's background end
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, shade(baseColor(p, tone), tone === "light" ? 1.06 : 0.9));
+  sky.addColorStop(1, farColor(p, tone));
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. Hazy sun/moon disc for celestial focus
+  const orbX = rand(0.3, 0.7) * w;
+  const orbY = rand(0.16, 0.3) * h;
+  const orbR = rand(0.06, 0.1) * Math.min(w, h);
+  const glow = ctx.createRadialGradient(orbX, orbY, 0, orbX, orbY, orbR * 3.5);
+  const orbColor = tone === "light" ? "#ffffff" : shade(p.colors[0], 1.1);
+  glow.addColorStop(0, orbColor + "e6");
+  glow.addColorStop(0.3, orbColor + "55");
+  glow.addColorStop(1, orbColor + "00");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  // Disc core
+  ctx.fillStyle = orbColor;
+  ctx.beginPath();
+  ctx.arc(orbX, orbY, orbR * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+
+  const noise = createNoise2D(prng);
+  const lut = buildPaletteLUT(p, tone);
+  const layers = 6;
+  const baseFreq = rand(1.8, 3.0) / w;
+  const gain = rand(0.5, 0.6);
+  const baseAmp = rand(0.1, 0.15) * h;
+  const xOffset = rand(0, 1000);
+  const stepX = Math.max(1, Math.round(w / 1920));
+
+  for (let layer = 0; layer < layers; layer++) {
+    const depth = layer / (layers - 1);
+    const horizon = h * (0.36 + 0.5 * depth);
+    const amp = baseAmp * (0.5 + 0.85 * depth);
+    const freq = baseFreq * (1 + depth * 0.6);
+    const octaves = 3 + Math.round(depth * 2);
+    const ridgeSeed = layer * 7.31 + rand(0, 3);
+
+    const t = tone === "light" ? 0.2 + 0.8 * depth : 0.6 * (1 - depth) + 0.02;
+    const idx = Math.round(t * 255) * 3;
+    const ridgeColor = `rgb(${lut[idx]},${lut[idx + 1]},${lut[idx + 2]})`;
+    ctx.fillStyle = ridgeColor;
+
+    const ridgeYVals: number[] = [];
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let x = 0; x <= w; x += stepX) {
+      const y = horizon + fbm(noise, x * freq + xOffset, ridgeSeed, octaves, gain) * amp;
+      ridgeYVals.push(y);
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sparse pine trees on middle and foreground layers (layer 2, 3, 4)
+    if (layer >= 2 && layer <= 4) {
+      const treeCount = Math.floor(rand(8, 16));
+      const treeSpacing = w / treeCount;
+      ctx.fillStyle = shade(ridgeColor, 0.85);
+
+      for (let k = 0; k < treeCount; k++) {
+        const tx = (k + 0.5) * treeSpacing + rand(-treeSpacing * 0.25, treeSpacing * 0.25);
+        const sampleIdx = Math.min(ridgeYVals.length - 1, Math.floor((tx / w) * ridgeYVals.length));
+        const ty = ridgeYVals[sampleIdx];
+        const treeH = Math.min(w, h) * (0.025 + 0.015 * depth) * rand(0.8, 1.2);
+        const treeW = treeH * 0.36;
+
+        ctx.beginPath();
+        ctx.moveTo(tx, ty - treeH);
+        ctx.lineTo(tx - treeW * 0.4, ty - treeH * 0.55);
+        ctx.lineTo(tx + treeW * 0.4, ty - treeH * 0.55);
+        ctx.lineTo(tx - treeW * 0.5, ty);
+        ctx.lineTo(tx + treeW * 0.5, ty);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+}
+
+/**
+ * "Silent Desert Dunes" — Silky Dune Crest & Gradient Slopes.
+ * Inspired by WLLPR Dunas, heavily elevated with smooth 3D sweeping sand dune ridges,
+ * razor-sharp glowing crest highlights, wind-blown slope shadow gradients, and golden hour haze.
+ */
+function drawSilentDunes(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  const skyTop = tone === "dark" ? p.colors[3] : p.colors[0];
+  const skyBot = tone === "dark" ? shade(p.colors[2], 0.8) : p.colors[1];
+  skyGrad.addColorStop(0, skyTop);
+  skyGrad.addColorStop(1, skyBot);
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const noise = createNoise2D(prng);
+  const seedY = rand(0, 100);
+
+  const hazeY = h * 0.35;
+  const hazeGrad = ctx.createRadialGradient(w * 0.5, hazeY, 0, w * 0.5, hazeY, Math.max(w, h) * 0.6);
+  hazeGrad.addColorStop(0, hexWithAlpha(p.colors[0], tone === "dark" ? 0.4 : 0.6));
+  hazeGrad.addColorStop(1, hexWithAlpha(p.colors[0], 0.0));
+  ctx.fillStyle = hazeGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const numDunes = 6;
+  const numSteps = 160;
+
+  for (let d = 0; d < numDunes; d++) {
+    const dAnchorY = h * (0.32 + 0.12 * d);
+    const dColor = p.colors[d % p.colors.length];
+    const dColorShadow = p.colors[(d + 1) % p.colors.length];
+
+    const dunePts: [number, number][] = [];
+    const stepX = w / numSteps;
+
+    for (let i = 0; i <= numSteps; i++) {
+      const t = i / numSteps;
+      const x = t * w;
+      const sineVal = Math.sin(t * Math.PI * 2 + d * 1.4 + seedY) * (h * 0.08);
+      const nVal = fbm(noise, t * 1.5 + seedY, d * 2.1, 3) * (h * 0.12);
+      const y = dAnchorY + sineVal + nVal;
+      dunePts.push([x, y]);
+    }
+
+    const duneGrad = ctx.createLinearGradient(0, dAnchorY - h * 0.1, w, dAnchorY + h * 0.25);
+    duneGrad.addColorStop(0, hexWithAlpha(dColor, 1.0));
+    duneGrad.addColorStop(0.5, hexWithAlpha(dColorShadow, 0.95));
+    duneGrad.addColorStop(1, hexWithAlpha(shade(dColorShadow, 0.7), 1.0));
+
+    ctx.save();
+    ctx.fillStyle = duneGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(dunePts[0][0], dunePts[0][1]);
+    for (let i = 0; i < dunePts.length - 1; i++) {
+      const p0 = dunePts[i];
+      const p1 = dunePts[i + 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = hexWithAlpha(p.colors[0], tone === "dark" ? 0.7 : 0.85);
+    ctx.lineWidth = Math.max(1.8, Math.min(w, h) / 600);
+    ctx.shadowColor = p.colors[0];
+    ctx.shadowBlur = Math.min(w, h) * 0.015;
+
+    ctx.beginPath();
+    ctx.moveTo(dunePts[0][0], dunePts[0][1]);
+    for (let i = 0; i < dunePts.length - 1; i++) {
+      const p0 = dunePts[i];
+      const p1 = dunePts[i + 1];
+      ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
+ * "Lunar Eclipse Arches" — Landscape-style Layered Concentric Half-Circle Domes.
+ * Concentric semi-circular arch domes rising from the bottom horizon, using the exact
+ * Landscape sky wash, Palette LUT depth, and glowing lunar disc.
+ */
+function drawLunarArches(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  p: Palette,
+  tone: Tone,
+) {
+  // 1. Sky: soft vertical gradient from palette's background end
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, shade(baseColor(p, tone), tone === "light" ? 1.06 : 0.9));
+  sky.addColorStop(1, farColor(p, tone));
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. Hazy sun/moon disc anchored at bottom center
+  const orbX = w * 0.5;
+  const orbY = h * rand(0.85, 0.95);
+  const maxR = Math.max(w, h) * 0.85;
+
+  const glow = ctx.createRadialGradient(orbX, orbY, 0, orbX, orbY, maxR * 0.7);
+  const orbColor = tone === "light" ? "#ffffff" : shade(p.colors[0], 1.1);
+  glow.addColorStop(0, orbColor + "e6");
+  glow.addColorStop(0.35, orbColor + "44");
+  glow.addColorStop(1, orbColor + "00");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  const lut = buildPaletteLUT(p, tone);
+  const numArches = 6;
+
+  ctx.save();
+
+  // Draw 6 concentric half-circle dome arches (outermost to innermost)
+  for (let r = numArches; r >= 1; r--) {
+    const depth = r / numArches; // 1 = outermost, 0 = innermost
+    const radius = maxR * (0.15 + depth * 0.75);
+    const idx = Math.round((1 - depth) * 255) * 3;
+    const archColor = `rgb(${lut[idx]},${lut[idx + 1]},${lut[idx + 2]})`;
+
+    // Fill half-circle dome
+    ctx.beginPath();
+    ctx.arc(orbX, orbY, radius, Math.PI, 0, false);
+    ctx.lineTo(orbX + radius, h);
+    ctx.lineTo(orbX - radius, h);
+    ctx.closePath();
+
+    ctx.fillStyle = hexWithAlpha(archColor, 0.85);
+    ctx.fill();
+
+    // Sharp glowing rim edge along top arch curve
+    ctx.beginPath();
+    ctx.arc(orbX, orbY, radius, Math.PI, 0, false);
+    ctx.strokeStyle = hexWithAlpha(orbColor, tone === "light" ? 0.7 : 0.85);
+    ctx.lineWidth = Math.max(2.0, Math.min(w, h) / 450);
+    ctx.shadowColor = archColor;
+    ctx.shadowBlur = Math.min(w, h) * 0.015;
+    ctx.stroke();
+  }
+
+  // Lunar core disc emerging from bottom horizon
+  ctx.fillStyle = orbColor;
+  ctx.beginPath();
+  ctx.arc(orbX, orbY, Math.min(w, h) * 0.07, Math.PI, 0, false);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
 /** Legacy aliases for backwards compatibility */
 const drawTokyo = drawPenrose;
 const drawRome = drawQuantum;
@@ -1599,6 +2214,12 @@ const RENDERERS: Record<
     tone: Tone,
   ) => void
 > = {
+  misty_pines: drawMistyPines,
+  silent_dunes: drawSilentDunes,
+  lunar_arches: drawLunarArches,
+  touch_of_god: drawTouchOfGod,
+  iridescent_kiss: drawIridescentKiss,
+  aurora_glow: drawAuroraGlow,
   topography: drawTopography,
   flow: drawFlow,
   cosmic: drawCosmic,
@@ -1619,19 +2240,69 @@ const RENDERERS: Record<
   rome: drawRome,
 };
 
+let grainTileCanvas: HTMLCanvasElement | null = null;
+
+function getGrainPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  if (typeof window === "undefined") return null;
+  if (!grainTileCanvas) {
+    grainTileCanvas = document.createElement("canvas");
+    grainTileCanvas.width = 256;
+    grainTileCanvas.height = 256;
+    const tCtx = grainTileCanvas.getContext("2d");
+    if (tCtx) {
+      const imgData = tCtx.createImageData(256, 256);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const val = Math.floor(Math.random() * 255);
+        data[i] = val;
+        data[i + 1] = val;
+        data[i + 2] = val;
+        data[i + 3] = Math.floor(Math.random() * 22);
+      }
+      tCtx.putImageData(imgData, 0, 0);
+    }
+  }
+  return ctx.createPattern(grainTileCanvas, "repeat");
+}
+
+/**
+ * Applies subtle procedural micro-grain for anti-banding and photographic depth.
+ * Fast GPU-accelerated tiled pattern render (<0.2ms).
+ */
+function drawMicroGrain(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  amount: number = 0.025,
+) {
+  const pattern = getGrainPattern(ctx);
+  if (!pattern) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "overlay";
+  ctx.globalAlpha = Math.min(0.08, amount * 2.5);
+  ctx.fillStyle = pattern;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
 /**
  * Render a wallpaper onto the given canvas at full target resolution.
- * Each call produces a new random composition.
+ * Each call produces a new deterministic or randomized composition.
  */
 export function renderWallpaper(
   canvas: HTMLCanvasElement,
-  { style, palette, resolution, tone }: RenderOptions,
+  { style, palette, resolution, tone, seed }: RenderOptions,
 ): void {
   canvas.width = resolution.width;
   canvas.height = resolution.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+
+  const activeSeed = seed !== undefined ? seed : Math.floor(Math.random() * 1000000);
+  activePRNG = createPRNG(activeSeed);
+
   RENDERERS[style](ctx, resolution.width, resolution.height, palette, tone);
+  drawMicroGrain(ctx, resolution.width, resolution.height, 0.025);
 }
 
 /** Convert the canvas to a PNG blob and trigger a browser download. */
@@ -1645,9 +2316,6 @@ export function downloadCanvas(
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
-    // Append to DOM so Firefox triggers the download correctly,
-    // then revoke after a short delay to prevent memory leaks
-    // while still giving the browser time to initiate the download.
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

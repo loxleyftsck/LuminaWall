@@ -52,8 +52,8 @@ const PreviewCanvas = forwardRef<HTMLCanvasElement, PreviewCanvasProps>(
       if (version === 0 || reduceMotion) return;
       animate(
         scope.current,
-        { opacity: [0.35, 1], scale: [0.985, 1] },
-        { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+        { opacity: [0.75, 1], scale: [0.995, 1] },
+        { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
       );
     }, [version, animate, scope, reduceMotion]);
 
@@ -175,7 +175,7 @@ const PreviewCanvas = forwardRef<HTMLCanvasElement, PreviewCanvasProps>(
             </div>
           )}
 
-          {resolution.id === "desktop4k" && (
+          {["desktop4k", "desktop5k", "desktop8k", "desktop10k"].includes(resolution.id) && (
             /* ---- Monitor: bezel, status LED, neck + base ---- */
             <div className="flex w-full flex-col items-center">
               <div className={`relative w-full rounded-2xl border-[10px] pb-5 ${bezel}`}>
