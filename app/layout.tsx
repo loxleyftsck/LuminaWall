@@ -7,6 +7,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
+import { SITE_URL } from "@/lib/site";
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -21,7 +22,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://luminawall.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: "LuminaWall — Minimalist Wallpaper Studio",
   description:
     "Generate premium minimalist wallpapers in your browser. 100% client-side, free, no sign-up. Desktop 4K and iPhone resolutions.",
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
     title: "LuminaWall — Minimalist Wallpaper Studio",
     description:
       "Generate premium minimalist wallpapers in your browser. 100% client-side, free, no sign-up. Desktop 4K and iPhone resolutions.",
-    url: "https://luminawall.vercel.app",
+    url: SITE_URL,
     siteName: "LuminaWall",
     type: "website",
   },
