@@ -102,106 +102,113 @@ export default function WallpaperStudio() {
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+    /* On desktop the studio is locked to one screen: the preview never
+       moves and all scrolling happens inside the control rail, so
+       changing a style never drags the result out of view. */
+    <div className="flex flex-col gap-6 lg:h-[calc(100vh-3rem)] lg:flex-row lg:items-stretch">
       {/* Preview */}
-      <GlassCard className="flex-1 p-4 sm:p-6">
+      <GlassCard className="flex-1 p-4 sm:p-6 lg:flex lg:min-h-0 lg:flex-col lg:justify-center lg:overflow-y-auto">
         <PreviewCanvas ref={canvasRef} resolution={resolution} version={animVersion} />
       </GlassCard>
 
       {/* Desktop Control rail (lg:block) */}
-      <GlassCard className="w-full shrink-0 space-y-7 p-6 lg:w-[340px]">
+      <GlassCard className="flex w-full shrink-0 flex-col p-6 lg:w-[340px] lg:min-h-0">
+        {/* Generate and Download sit outside the scroll area so the two
+            primary actions stay reachable at any scroll position. */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           onClick={handleGenerate}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-mist px-6 py-4 font-semibold text-abyss shadow-[0_10px_40px_-10px_rgba(238,241,246,0.35)]"
+          className="flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-mist px-6 py-4 font-semibold text-abyss shadow-[0_10px_40px_-10px_rgba(238,241,246,0.35)]"
         >
           <Sparkles size={18} />
           {t("generate")}
         </motion.button>
 
-        <SegmentedControl
-          id="style"
-          label={t("style")}
-          columns={3}
-          value={style}
-          onChange={setStyle}
-          options={STYLES.map((s) => ({ value: s.id, label: s.name }))}
-        />
+        <div className="rail-scroll mt-7 space-y-7 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
+          <SegmentedControl
+            id="style"
+            label={t("style")}
+            columns={3}
+            value={style}
+            onChange={setStyle}
+            options={STYLES.map((s) => ({ value: s.id, label: s.name }))}
+          />
 
-        {(() => {
-          const currentStyleObj = STYLES.find((s) => s.id === style);
-          if (!currentStyleObj?.journalRef) return null;
-          return (
+          {(() => {
+            const currentStyleObj = STYLES.find((s) => s.id === style);
+            if (!currentStyleObj?.journalRef) return null;
+            return (
+              <div className="-mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
+                <p className="text-[11px] text-mist/90">
+                  📄 {t("journalRef")}: <span className="text-lumen font-medium">{currentStyleObj.journalRef}</span>
+                </p>
+              </div>
+            );
+          })()}
+
+          <PaletteSelector value={palette} onChange={setPalette} />
+
+          <SegmentedControl<Tone>
+            id="tone"
+            label={t("tone")}
+            columns={2}
+            value={tone}
+            onChange={setTone}
+            options={[
+              { value: "light", label: t("toneLight"), icon: <Sun size={15} /> },
+              { value: "dark", label: t("toneDark"), icon: <Moon size={15} /> },
+            ]}
+          />
+
+          <SegmentedControl
+            id="resolution"
+            label={t("resolution")}
+            columns={2}
+            value={resolution.id}
+            onChange={(id) =>
+              setResolution(RESOLUTIONS.find((r) => r.id === id) ?? RESOLUTIONS[0])
+            }
+            options={RESOLUTIONS.map((r) => {
+              const icons: Record<string, ReactNode> = {
+                desktop4k: <Monitor size={15} />,
+                desktop5k: <Monitor size={15} />,
+                desktop8k: <Monitor size={15} />,
+                desktop10k: <Monitor size={15} />,
+                iphone: <Smartphone size={15} />,
+                fhd_plus: <Smartphone size={15} />,
+                one_five_k: <Smartphone size={15} />,
+                qhd_plus: <Smartphone size={15} />,
+                mobile_4k: <Smartphone size={15} />,
+                ipad: <Tablet size={15} />,
+                macbook: <Laptop size={15} />,
+              };
+              return { value: r.id, label: r.label, icon: icons[r.id] ?? <Smartphone size={15} /> };
+            })}
+          />
+
+          {resolution.deviceRef && (
             <div className="-mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
-              <p className="text-[11px] text-mist/90">
-                📄 {t("journalRef")}: <span className="text-lumen font-medium">{currentStyleObj.journalRef}</span>
+              <p className="text-dim font-medium">
+                <span className="text-mist font-semibold">{resolution.label}</span> ({resolution.width}×{resolution.height}px)
               </p>
+              <p className="mt-1 text-[11px] text-mist/90">
+                📱 {t("deviceReference")}: <span className="text-lumen font-medium">{resolution.deviceRef}</span>
+              </p>
+              {resolution.ppi && (
+                <p className="mt-0.5 text-[10px] text-faint">
+                  ⚡ {t("sharpnessPanel")}: {resolution.ppi} · {resolution.panelTech}
+                </p>
+              )}
             </div>
-          );
-        })()}
-
-        <PaletteSelector value={palette} onChange={setPalette} />
-
-        <SegmentedControl<Tone>
-          id="tone"
-          label={t("tone")}
-          columns={2}
-          value={tone}
-          onChange={setTone}
-          options={[
-            { value: "light", label: t("toneLight"), icon: <Sun size={15} /> },
-            { value: "dark", label: t("toneDark"), icon: <Moon size={15} /> },
-          ]}
-        />
-
-        <SegmentedControl
-          id="resolution"
-          label={t("resolution")}
-          columns={2}
-          value={resolution.id}
-          onChange={(id) =>
-            setResolution(RESOLUTIONS.find((r) => r.id === id) ?? RESOLUTIONS[0])
-          }
-          options={RESOLUTIONS.map((r) => {
-            const icons: Record<string, ReactNode> = {
-              desktop4k: <Monitor size={15} />,
-              desktop5k: <Monitor size={15} />,
-              desktop8k: <Monitor size={15} />,
-              desktop10k: <Monitor size={15} />,
-              iphone: <Smartphone size={15} />,
-              fhd_plus: <Smartphone size={15} />,
-              one_five_k: <Smartphone size={15} />,
-              qhd_plus: <Smartphone size={15} />,
-              mobile_4k: <Smartphone size={15} />,
-              ipad: <Tablet size={15} />,
-              macbook: <Laptop size={15} />,
-            };
-            return { value: r.id, label: r.label, icon: icons[r.id] ?? <Smartphone size={15} /> };
-          })}
-        />
-
-        {resolution.deviceRef && (
-          <div className="-mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
-            <p className="text-dim font-medium">
-              <span className="text-mist font-semibold">{resolution.label}</span> ({resolution.width}×{resolution.height}px)
-            </p>
-            <p className="mt-1 text-[11px] text-mist/90">
-              📱 {t("deviceReference")}: <span className="text-lumen font-medium">{resolution.deviceRef}</span>
-            </p>
-            {resolution.ppi && (
-              <p className="mt-0.5 text-[10px] text-faint">
-                ⚡ {t("sharpnessPanel")}: {resolution.ppi} · {resolution.panelTech}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           onClick={handleDownload}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 px-6 py-3.5 font-medium text-mist transition-colors hover:bg-white/[0.06]"
+          className="mt-7 flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/15 px-6 py-3.5 font-medium text-mist transition-colors hover:bg-white/[0.06]"
         >
           <Download size={17} />
           {t("download")}
