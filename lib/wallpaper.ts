@@ -2136,65 +2136,198 @@ function drawLunarArches(
   p: Palette,
   tone: Tone,
 ) {
-  // 1. Sky: soft vertical gradient from palette's background end
+  const dark = tone === "dark";
+
+  // Springline: where every arch meets the ground and the eclipsed
+  // disc rises. Radii are measured from here.
+  const cx = w * 0.5;
+  const cy = h * rand(0.74, 0.82);
+  const moonR = Math.min(w, h) * rand(0.085, 0.115);
+  // Spans the full width at the springline while keeping the outermost
+  // apex just off the top edge, so the run frames rather than crops.
+  const maxR = Math.hypot(w * 0.5, cy) * 0.86;
+  const rMin = moonR * 1.5;
+
+  // 1. Sky — deepest overhead, warming down toward the springline.
   const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, shade(baseColor(p, tone), tone === "light" ? 1.06 : 0.9));
-  sky.addColorStop(1, farColor(p, tone));
+  sky.addColorStop(0, shade(baseColor(p, tone), dark ? 0.5 : 1.1));
+  sky.addColorStop(0.6, shade(farColor(p, tone), dark ? 0.78 : 1.0));
+  sky.addColorStop(1, shade(farColor(p, tone), dark ? 1.1 : 0.9));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
 
-  // 2. Hazy sun/moon disc anchored at bottom center
-  const orbX = w * 0.5;
-  const orbY = h * rand(0.85, 0.95);
-  const maxR = Math.max(w, h) * 0.85;
-
-  const glow = ctx.createRadialGradient(orbX, orbY, 0, orbX, orbY, maxR * 0.7);
-  const orbColor = tone === "light" ? "#ffffff" : shade(p.colors[0], 1.1);
-  glow.addColorStop(0, orbColor + "e6");
-  glow.addColorStop(0.35, orbColor + "44");
-  glow.addColorStop(1, orbColor + "00");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, w, h);
-
-  const lut = buildPaletteLUT(p, tone);
-  const numArches = 6;
-
-  ctx.save();
-
-  // Draw 6 concentric half-circle dome arches (outermost to innermost)
-  for (let r = numArches; r >= 1; r--) {
-    const depth = r / numArches; // 1 = outermost, 0 = innermost
-    const radius = maxR * (0.15 + depth * 0.75);
-    const idx = Math.round((1 - depth) * 255) * 3;
-    const archColor = `rgb(${lut[idx]},${lut[idx + 1]},${lut[idx + 2]})`;
-
-    // Fill half-circle dome
-    ctx.beginPath();
-    ctx.arc(orbX, orbY, radius, Math.PI, 0, false);
-    ctx.lineTo(orbX + radius, h);
-    ctx.lineTo(orbX - radius, h);
-    ctx.closePath();
-
-    ctx.fillStyle = hexWithAlpha(archColor, 0.85);
-    ctx.fill();
-
-    // Sharp glowing rim edge along top arch curve
-    ctx.beginPath();
-    ctx.arc(orbX, orbY, radius, Math.PI, 0, false);
-    ctx.strokeStyle = hexWithAlpha(orbColor, tone === "light" ? 0.7 : 0.85);
-    ctx.lineWidth = Math.max(2.0, Math.min(w, h) / 450);
-    ctx.shadowColor = archColor;
-    ctx.shadowBlur = Math.min(w, h) * 0.015;
-    ctx.stroke();
+  // 2. Starfield, washed out where the corona is brightest.
+  if (dark) {
+    ctx.fillStyle = "#ffffff";
+    const stars = Math.round((w * h) / 52000);
+    for (let i = 0; i < stars; i++) {
+      const sx = rand(0, w);
+      const sy = rand(0, cy);
+      const s = Math.max(1, rand(0.4, 1.5) * (w / 3840));
+      const d = Math.hypot(sx - cx, sy - cy) / maxR;
+      ctx.globalAlpha = rand(0.1, 0.65) * Math.min(1, d * 1.7);
+      ctx.fillRect(sx, sy, s, s);
+    }
+    ctx.globalAlpha = 1;
   }
 
-  // Lunar core disc emerging from bottom horizon
-  ctx.fillStyle = orbColor;
+  const lightCol = dark ? shade(p.colors[0], 1.3) : "#ffffff";
+
+  // LUT samples come back as hex so shade()/hexWithAlpha() both apply —
+  // shade() is a no-op on rgb() strings.
+  const lut = buildPaletteLUT(p, tone);
+  const lutHex = (t: number) => {
+    const i = Math.round(Math.min(1, Math.max(0, t)) * 255) * 3;
+    return (
+      "#" +
+      [lut[i], lut[i + 1], lut[i + 2]]
+        .map((v) => v.toString(16).padStart(2, "0"))
+        .join("")
+    );
+  };
+
+  // 3. Corona bloom, laid down before the arches so it reads through
+  //    the gaps between them.
+  const bloom = ctx.createRadialGradient(cx, cy, moonR * 0.5, cx, cy, maxR * 0.75);
+  bloom.addColorStop(0, hexWithAlpha(lightCol, dark ? 0.72 : 0.78));
+  bloom.addColorStop(0.12, hexWithAlpha(lightCol, 0.28));
+  bloom.addColorStop(0.4, hexWithAlpha(lightCol, 0.09));
+  bloom.addColorStop(1, hexWithAlpha(lightCol, 0));
+  ctx.fillStyle = bloom;
+  ctx.fillRect(0, 0, w, h);
+
+  // 4. Arches, outermost first so nearer bands overlap correctly.
+  const numArches = 7;
+  ctx.save();
+  for (let i = numArches - 1; i >= 0; i--) {
+    const t = i / (numArches - 1); // 1 = outermost, 0 = innermost
+    // Gaps and band widths both grow outward, so the run reads as
+    // receding perspective rather than a flat target.
+    const rOuter = rMin + (maxR - rMin) * Math.pow(t, 1.75);
+    const band = (maxR - rMin) * 0.07 * (0.3 + t * 1.2);
+    const rInner = Math.max(rMin * 0.92, rOuter - band);
+
+    // An annulus — outer arc left→right, inner arc back right→left —
+    // rather than a solid dome, so light spills between the arches.
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, Math.PI, 0, false);
+    ctx.arc(cx, cy, rInner, 0, Math.PI, true);
+    ctx.closePath();
+
+    const face = lutHex(dark ? 0.15 + t * 0.7 : 0.85 - t * 0.7);
+    const g = ctx.createLinearGradient(0, cy - rOuter, 0, cy);
+    g.addColorStop(0, hexWithAlpha(shade(face, dark ? 1.15 : 1.0), dark ? 0.95 : 0.9));
+    g.addColorStop(1, hexWithAlpha(shade(face, dark ? 0.55 : 0.78), dark ? 0.99 : 0.96));
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Rim caustic: brightest at the zenith, gone by the springline —
+    // the limb glows where it is tangent to the line of sight.
+    const rim = ctx.createLinearGradient(0, cy - rOuter, 0, cy);
+    rim.addColorStop(0, hexWithAlpha(lightCol, dark ? 0.95 : 0.85));
+    rim.addColorStop(0.55, hexWithAlpha(lightCol, dark ? 0.36 : 0.3));
+    rim.addColorStop(1, hexWithAlpha(lightCol, 0));
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, Math.PI, 0, false);
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = Math.max(1.5, Math.min(w, h) / 900);
+    ctx.shadowColor = hexWithAlpha(lightCol, 0.75);
+    ctx.shadowBlur = Math.min(w, h) * 0.012;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 5. Eclipse — halo, occulting body, then the bright limb.
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const halo = ctx.createRadialGradient(cx, cy, moonR * 0.9, cx, cy, moonR * 2.6);
+  halo.addColorStop(0, hexWithAlpha(lightCol, dark ? 0.95 : 0.8));
+  halo.addColorStop(0.3, hexWithAlpha(lightCol, 0.28));
+  halo.addColorStop(1, hexWithAlpha(lightCol, 0));
+  ctx.fillStyle = halo;
+  ctx.fillRect(cx - moonR * 2.8, cy - moonR * 2.8, moonR * 5.6, moonR * 5.6);
+  ctx.restore();
+
+  // The occulting body reads dark against the corona, but never flat
+  // black: in totality the disc is lit by sunlight refracted through
+  // Earth's atmosphere, Rayleigh scattering having stripped the short
+  // wavelengths on the way through.
+  const bodyCol = lutHex(dark ? 0.06 : 0.1);
+  const body = ctx.createRadialGradient(
+    cx - moonR * 0.3, cy - moonR * 0.32, moonR * 0.05,
+    cx, cy, moonR,
+  );
+  body.addColorStop(0, shade(bodyCol, dark ? 0.55 : 0.42));
+  body.addColorStop(0.65, shade(bodyCol, dark ? 0.3 : 0.22));
+  body.addColorStop(1, shade(bodyCol, dark ? 0.16 : 0.12));
   ctx.beginPath();
-  ctx.arc(orbX, orbY, Math.min(w, h) * 0.07, Math.PI, 0, false);
-  ctx.closePath();
+  ctx.arc(cx, cy, moonR, 0, Math.PI * 2);
+  ctx.fillStyle = body;
   ctx.fill();
 
+  // Earthshine pooling just inside the limb.
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const shine = ctx.createRadialGradient(cx, cy, moonR * 0.55, cx, cy, moonR);
+  shine.addColorStop(0, hexWithAlpha(lightCol, 0));
+  shine.addColorStop(1, hexWithAlpha(lightCol, dark ? 0.3 : 0.22));
+  ctx.beginPath();
+  ctx.arc(cx, cy, moonR, 0, Math.PI * 2);
+  ctx.fillStyle = shine;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, moonR, 0, Math.PI * 2);
+  ctx.strokeStyle = hexWithAlpha(lightCol, dark ? 0.95 : 0.85);
+  ctx.lineWidth = Math.max(1.5, Math.min(w, h) / 700);
+  ctx.shadowColor = hexWithAlpha(lightCol, 0.9);
+  ctx.shadowBlur = moonR * 0.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // 6. Ground plane — drawn last over the disc's lower half so the
+  //    eclipse reads as half-risen at the horizon.
+  // Light tone samples nearer the middle of the ramp: the darkest stop
+  // reads as a black slab under a near-white sky.
+  const groundCol = lutHex(dark ? 0.08 : 0.62);
+  const ground = ctx.createLinearGradient(0, cy, 0, h);
+  ground.addColorStop(0, shade(groundCol, dark ? 0.5 : 0.92));
+  ground.addColorStop(1, shade(groundCol, dark ? 0.28 : 0.68));
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, cy, w, h - cy);
+
+  // Reflection: corona spilling onto the ground. A vertically stretched
+  // radial keeps every edge soft — a clipped ellipse would read as a
+  // hard-edged bulge below the horizon.
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.translate(cx, cy);
+  ctx.scale(1, (h - cy) / (moonR * 2.4));
+  const refl = ctx.createRadialGradient(0, 0, 0, 0, 0, moonR * 2.4);
+  refl.addColorStop(0, hexWithAlpha(lightCol, dark ? 0.34 : 0.4));
+  refl.addColorStop(0.45, hexWithAlpha(lightCol, 0.1));
+  refl.addColorStop(1, hexWithAlpha(lightCol, 0));
+  ctx.fillStyle = refl;
+  ctx.fillRect(-w, 0, w * 2, moonR * 2.4);
+  ctx.restore();
+
+  // Horizon haze dissolves the ground's hard upper edge. Stretched into
+  // a wide, shallow ellipse around the disc so it fades out toward the
+  // frame edges instead of banding straight across.
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.translate(cx, cy);
+  const hazeH = moonR * 0.55;
+  ctx.scale((maxR * 0.85) / hazeH, 1);
+  const haze = ctx.createRadialGradient(0, 0, 0, 0, 0, hazeH);
+  haze.addColorStop(0, hexWithAlpha(lightCol, dark ? 0.32 : 0.4));
+  haze.addColorStop(0.5, hexWithAlpha(lightCol, dark ? 0.12 : 0.16));
+  haze.addColorStop(1, hexWithAlpha(lightCol, 0));
+  ctx.fillStyle = haze;
+  ctx.fillRect(-hazeH, -hazeH, hazeH * 2, hazeH * 2);
   ctx.restore();
 }
 
