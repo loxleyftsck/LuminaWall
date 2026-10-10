@@ -1,0 +1,29 @@
+name: Quality checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Fixture for metadata checks, not the deployment's public domain.
+      NEXT_PUBLIC_SITE_URL: https://ci.luminawall.example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Verify canonical, robots and sitemap from the built server
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/luminawall-smoke.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          npm run smoke:metadata
+      - run: npm audit --audit-level=high

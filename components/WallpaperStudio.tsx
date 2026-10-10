@@ -1,409 +1,48 @@
 "use client";
-
-/**
- * LuminaWall — dibuat oleh Herald Ginting
- */
-
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  Download,
-  Laptop,
-  Monitor,
-  Moon,
-  Palette as PaletteIcon,
-  SlidersHorizontal,
-  Smartphone,
-  Sparkles,
-  Sun,
-  Tablet,
-  Wand2,
-  X,
-} from "lucide-react";
-import {
-  PALETTES,
-  RESOLUTIONS,
-  STYLES,
-  type Palette,
-  type Resolution,
-  type StyleId,
-  type Tone,
-  downloadCanvas,
-  renderWallpaper,
-} from "@/lib/wallpaper";
-import GlassCard from "@/components/ui/GlassCard";
+import {useEffect,useRef,useState} from "react";
+import {Download,Shuffle,SlidersHorizontal,X} from "lucide-react";
+import {PALETTES,RESOLUTIONS,STYLES,type StyleId,type Tone} from "@/lib/wallpaper";
+import {useArtwork} from "@/lib/use-artwork";
+import LoadingIndicator from "@/components/LoadingIndicator";
+import {useLanguage} from "@/lib/i18n";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PaletteSelector from "@/components/PaletteSelector";
-import PreviewCanvas from "@/components/PreviewCanvas";
-import AdInterstitial from "@/components/AdInterstitial";
-import { useLanguage } from "@/lib/i18n";
-
-/** Every 4th Generate click triggers the interstitial placeholder. */
-const AD_FREQUENCY = 4;
-
-/**
- * WallpaperStudio — client-side orchestrator. Owns all generation
- * state and the full-resolution canvas; child components are pure UI.
- */
-export default function WallpaperStudio() {
-  const { t } = useLanguage();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const clickCount = useRef(0);
-  const versionRef = useRef(0);
-  const [animVersion, setAnimVersion] = useState(0);
-
-  const [style, setStyle] = useState<StyleId>("flow");
-  const [palette, setPalette] = useState<Palette>(PALETTES[0]);
-  const [tone, setTone] = useState<Tone>("light");
-  const [resolution, setResolution] = useState<Resolution>(RESOLUTIONS[0]);
-  const [showAd, setShowAd] = useState(false);
-  const [seed, setSeed] = useState(0);
-
-  // Mobile Bottom Sheet active tab state
-  const [activeMobileTab, setActiveMobileTab] = useState<"none" | "style" | "palette" | "resolution">("none");
-
-  const renderAnimationFrameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    if (renderAnimationFrameRef.current) {
-      cancelAnimationFrame(renderAnimationFrameRef.current);
-    }
-    renderAnimationFrameRef.current = requestAnimationFrame(() => {
-      if (canvasRef.current) {
-        renderWallpaper(canvasRef.current, { style, palette, resolution, tone, seed });
-        versionRef.current += 1;
-        setAnimVersion(versionRef.current);
-      }
-    });
-    return () => {
-      if (renderAnimationFrameRef.current) {
-        cancelAnimationFrame(renderAnimationFrameRef.current);
-      }
-    };
-  }, [style, palette, resolution, tone, seed]);
-
-  const handleGenerate = () => {
-    clickCount.current += 1;
-    if (clickCount.current % AD_FREQUENCY === 0) {
-      setShowAd(true);
-    } else {
-      setSeed((s) => s + 1);
-    }
-  };
-
-  const dismissAd = () => {
-    setShowAd(false);
-    setSeed((s) => s + 1);
-  };
-
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
-    downloadCanvas(
-      canvasRef.current,
-      `luminawall-${style}-${palette.id}-${resolution.width}x${resolution.height}.png`,
-    );
-  };
-
-  return (
-    /* On desktop the studio is locked to one screen: the preview never
-       moves and all scrolling happens inside the control rail, so
-       changing a style never drags the result out of view. */
-    <div className="flex flex-col gap-6 lg:h-[calc(100vh-3rem)] lg:flex-row lg:items-stretch">
-      {/* Preview */}
-      <GlassCard className="flex-1 p-4 sm:p-6 lg:flex lg:min-h-0 lg:flex-col lg:justify-center lg:overflow-y-auto">
-        <PreviewCanvas ref={canvasRef} resolution={resolution} version={animVersion} />
-      </GlassCard>
-
-      {/* Desktop Control rail (lg:block) */}
-      <GlassCard className="flex w-full shrink-0 flex-col p-6 lg:w-[340px] lg:min-h-0">
-        {/* Generate and Download sit outside the scroll area so the two
-            primary actions stay reachable at any scroll position. */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={handleGenerate}
-          className="flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-mist px-6 py-4 font-semibold text-abyss shadow-[0_10px_40px_-10px_rgba(238,241,246,0.35)]"
-        >
-          <Sparkles size={18} />
-          {t("generate")}
-        </motion.button>
-
-        <div className="rail-scroll mt-7 space-y-7 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
-          <SegmentedControl
-            id="style"
-            label={t("style")}
-            columns={3}
-            value={style}
-            onChange={setStyle}
-            options={STYLES.map((s) => ({ value: s.id, label: s.name }))}
-          />
-
-          {(() => {
-            const currentStyleObj = STYLES.find((s) => s.id === style);
-            if (!currentStyleObj?.journalRef) return null;
-            return (
-              <div className="-mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
-                <p className="text-[11px] text-mist/90">
-                  📄 {t("journalRef")}: <span className="text-lumen font-medium">{currentStyleObj.journalRef}</span>
-                </p>
-              </div>
-            );
-          })()}
-
-          <PaletteSelector value={palette} onChange={setPalette} />
-
-          <SegmentedControl<Tone>
-            id="tone"
-            label={t("tone")}
-            columns={2}
-            value={tone}
-            onChange={setTone}
-            options={[
-              { value: "light", label: t("toneLight"), icon: <Sun size={15} /> },
-              { value: "dark", label: t("toneDark"), icon: <Moon size={15} /> },
-            ]}
-          />
-
-          <SegmentedControl
-            id="resolution"
-            label={t("resolution")}
-            columns={2}
-            value={resolution.id}
-            onChange={(id) =>
-              setResolution(RESOLUTIONS.find((r) => r.id === id) ?? RESOLUTIONS[0])
-            }
-            options={RESOLUTIONS.map((r) => {
-              const icons: Record<string, ReactNode> = {
-                desktop4k: <Monitor size={15} />,
-                desktop5k: <Monitor size={15} />,
-                desktop8k: <Monitor size={15} />,
-                desktop10k: <Monitor size={15} />,
-                iphone: <Smartphone size={15} />,
-                fhd_plus: <Smartphone size={15} />,
-                one_five_k: <Smartphone size={15} />,
-                qhd_plus: <Smartphone size={15} />,
-                mobile_4k: <Smartphone size={15} />,
-                ipad: <Tablet size={15} />,
-                macbook: <Laptop size={15} />,
-              };
-              return { value: r.id, label: r.label, icon: icons[r.id] ?? <Smartphone size={15} /> };
-            })}
-          />
-
-          {resolution.deviceRef && (
-            <div className="-mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
-              <p className="text-dim font-medium">
-                <span className="text-mist font-semibold">{resolution.label}</span> ({resolution.width}×{resolution.height}px)
-              </p>
-              <p className="mt-1 text-[11px] text-mist/90">
-                📱 {t("deviceReference")}: <span className="text-lumen font-medium">{resolution.deviceRef}</span>
-              </p>
-              {resolution.ppi && (
-                <p className="mt-0.5 text-[10px] text-faint">
-                  ⚡ {t("sharpnessPanel")}: {resolution.ppi} · {resolution.panelTech}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={handleDownload}
-          className="mt-7 flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/15 px-6 py-3.5 font-medium text-mist transition-colors hover:bg-white/[0.06]"
-        >
-          <Download size={17} />
-          {t("download")}
-        </motion.button>
-      </GlassCard>
-
-      {/* Mobile Floating Bottom Bar (lg:hidden) */}
-      <div className="fixed bottom-3 left-3 right-3 z-40 flex items-center justify-between gap-1.5 rounded-2xl border border-white/15 bg-[#090b10]/95 p-2 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] lg:hidden">
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={handleGenerate}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-mist px-3 py-2.5 text-xs font-bold text-abyss shadow-md"
-        >
-          <Sparkles size={15} />
-          {t("generate")}
-        </motion.button>
-
-        <button
-          onClick={() => setActiveMobileTab(activeMobileTab === "style" ? "none" : "style")}
-          className={`flex items-center gap-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
-            activeMobileTab === "style"
-              ? "bg-white/20 text-mist"
-              : "text-dim hover:text-mist"
-          }`}
-        >
-          <Wand2 size={15} />
-          <span>{t("style")}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveMobileTab(activeMobileTab === "palette" ? "none" : "palette")}
-          className={`flex items-center gap-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
-            activeMobileTab === "palette"
-              ? "bg-white/20 text-mist"
-              : "text-dim hover:text-mist"
-          }`}
-        >
-          <PaletteIcon size={15} />
-          <span>{t("palette")}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveMobileTab(activeMobileTab === "resolution" ? "none" : "resolution")}
-          className={`flex items-center gap-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
-            activeMobileTab === "resolution"
-              ? "bg-white/20 text-mist"
-              : "text-dim hover:text-mist"
-          }`}
-        >
-          <SlidersHorizontal size={15} />
-          <span>{t("resolution")}</span>
-        </button>
-
-        <button
-          onClick={handleDownload}
-          aria-label={t("download")}
-          className="flex items-center justify-center rounded-xl border border-white/15 p-2.5 text-mist hover:bg-white/10"
-        >
-          <Download size={15} />
-        </button>
-      </div>
-
-      {/* Mobile Bottom Sheet Drawer */}
-      <AnimatePresence>
-        {activeMobileTab !== "none" && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setActiveMobileTab("none")}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden"
-            />
-
-            {/* Bottom Sheet */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              className="fixed inset-x-0 bottom-0 z-50 max-h-[65vh] overflow-y-auto rounded-t-3xl border-t border-white/15 bg-[#0d0f17] p-5 shadow-2xl lg:hidden"
-            >
-              <div className="mb-4 flex items-center justify-between pb-2 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-10 rounded-full bg-white/20" />
-                  <span className="text-sm font-bold uppercase tracking-wider text-mist">
-                    {activeMobileTab === "style" && t("style")}
-                    {activeMobileTab === "palette" && t("palette")}
-                    {activeMobileTab === "resolution" && t("resolution")}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setActiveMobileTab("none")}
-                  className="rounded-full p-1 text-dim hover:bg-white/10 hover:text-mist"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {activeMobileTab === "style" && (
-                <div className="space-y-4">
-                  <SegmentedControl
-                    id="mobile_style"
-                    label={t("style")}
-                    columns={3}
-                    value={style}
-                    onChange={setStyle}
-                    options={STYLES.map((s) => ({ value: s.id, label: s.name }))}
-                  />
-                  {(() => {
-                    const currentStyleObj = STYLES.find((s) => s.id === style);
-                    if (!currentStyleObj?.journalRef) return null;
-                    return (
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
-                        <p className="text-[11px] text-mist/90">
-                          📄 {t("journalRef")}: <span className="text-lumen font-medium">{currentStyleObj.journalRef}</span>
-                        </p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {activeMobileTab === "palette" && (
-                <div className="space-y-4">
-                  <PaletteSelector value={palette} onChange={setPalette} />
-                  <SegmentedControl<Tone>
-                    id="mobile_tone"
-                    label={t("tone")}
-                    columns={2}
-                    value={tone}
-                    onChange={setTone}
-                    options={[
-                      { value: "light", label: t("toneLight"), icon: <Sun size={15} /> },
-                      { value: "dark", label: t("toneDark"), icon: <Moon size={15} /> },
-                    ]}
-                  />
-                </div>
-              )}
-
-              {activeMobileTab === "resolution" && (
-                <div className="space-y-4">
-                  <SegmentedControl
-                    id="mobile_resolution"
-                    label={t("resolution")}
-                    columns={2}
-                    value={resolution.id}
-                    onChange={(id) =>
-                      setResolution(RESOLUTIONS.find((r) => r.id === id) ?? RESOLUTIONS[0])
-                    }
-                    options={RESOLUTIONS.map((r) => {
-                      const icons: Record<string, ReactNode> = {
-                        desktop4k: <Monitor size={15} />,
-                        desktop5k: <Monitor size={15} />,
-                        desktop8k: <Monitor size={15} />,
-                        desktop10k: <Monitor size={15} />,
-                        iphone: <Smartphone size={15} />,
-                        fhd_plus: <Smartphone size={15} />,
-                        one_five_k: <Smartphone size={15} />,
-                        qhd_plus: <Smartphone size={15} />,
-                        mobile_4k: <Smartphone size={15} />,
-                        ipad: <Tablet size={15} />,
-                        macbook: <Laptop size={15} />,
-                      };
-                      return { value: r.id, label: r.label, icon: icons[r.id] ?? <Smartphone size={15} /> };
-                    })}
-                  />
-                  {resolution.deviceRef && (
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs">
-                      <p className="text-dim font-medium">
-                        <span className="text-mist font-semibold">{resolution.label}</span> ({resolution.width}×{resolution.height}px)
-                      </p>
-                      <p className="mt-1 text-[11px] text-mist/90">
-                        📱 {t("deviceReference")}: <span className="text-lumen font-medium">{resolution.deviceRef}</span>
-                      </p>
-                      {resolution.ppi && (
-                        <p className="mt-0.5 text-[10px] text-faint">
-                          ⚡ {t("sharpnessPanel")}: {resolution.ppi} · {resolution.panelTech}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      <AdInterstitial open={showAd} onDismiss={dismissAd} />
-    </div>
-  );
+import DeviceFrame from "@/components/DeviceFrame";
+import {DEVICES,getDevice,deviceResolutions,type DeviceId} from "@/lib/devices";
+const CURATED:StyleId[]=["misty_pines","silent_dunes","lunar_arches","flow","iridescent_kiss","mandala"];
+export default function WallpaperStudio(){
+const {t,lang}=useLanguage();
+const [style,setStyle]=useState<StyleId>("misty_pines"),[palette,setPalette]=useState(PALETTES[0]),[tone,setTone]=useState<Tone>("light"),[resolution,setResolution]=useState(RESOLUTIONS[0]),[seed,setSeed]=useState(37),[allStyles,setAllStyles]=useState(false);
+const [device,setDevice]=useState<DeviceId>("monitor");
+const [showClock,setShowClock]=useState(true),[landscape,setLandscape]=useState(false);
+const exportResolution=landscape&&getDevice(device).kind==="tablet"?{...resolution,width:resolution.height,height:resolution.width}:resolution;
+const artwork=useArtwork({kind:"wallpaper",options:{style,palette,tone,resolution:exportResolution,seed}},exportResolution);
+const profile=getDevice(device);
+const sizes=deviceResolutions(device);
+const changeDevice=(value:DeviceId)=>{setDevice(value);setLandscape(false);const available=deviceResolutions(value);setResolution(available[0]);};
+const devicePicker=<label className="select-control device-picker"><span>{lang==="id"?"Perangkat":"Device"}</span><select aria-label={lang==="id"?"Perangkat preview":"Preview device"} disabled={artwork.exporting} value={device} onChange={event=>changeDevice(event.target.value as DeviceId)}>{DEVICES.map(item=><option key={item.id} value={item.id}>{item.id==="canvas"?(lang==="id"?"Tanpa bingkai":"No frame"):item.label}</option>)}</select></label>;
+const dialogRef=useRef<HTMLDialogElement>(null);
+const devicePreviewRef=useRef<HTMLDivElement>(null);
+const previousDeviceView=useRef(device+":"+landscape);
+useEffect(()=>{
+ const view=device+":"+landscape;
+ if(previousDeviceView.current===view)return;
+ previousDeviceView.current=view;
+ const frame=devicePreviewRef.current?.querySelector<HTMLElement>(".device-frame");
+ const reducedMotion=window.matchMedia("(prefers-reduced-motion: reduce)");
+ if(!frame||reducedMotion.matches)return;
+ // Keep the canvas mounted so switching devices with the same export size preserves the artwork.
+ const animation=frame.animate([
+  {opacity:0,transform:"translateY(12px) scale(0.96)"},
+  {opacity:1,transform:"translateY(0) scale(1)"}
+ ],{duration:360,easing:"cubic-bezier(0.22, 1, 0.36, 1)"});
+ const stopForReducedMotion=()=>{if(reducedMotion.matches)animation.cancel();};
+ reducedMotion.addEventListener("change",stopForReducedMotion);
+ return ()=>{animation.cancel();reducedMotion.removeEventListener("change",stopForReducedMotion);};
+},[device,landscape]);
+const styles=allStyles?STYLES:STYLES.filter(item=>CURATED.includes(item.id)||item.id===style);
+useEffect(()=>{const query=new URLSearchParams(window.location.search);const selected=STYLES.find(item=>item.id===query.get("style"));if(selected)setStyle(selected.id);const selectedPalette=PALETTES.find(item=>item.id===query.get("palette"));if(selectedPalette)setPalette(selectedPalette);},[]);
+const download=()=>void artwork.exportImage(`luminawall-${style}-${palette.id}-${seed}-${exportResolution.width}x${exportResolution.height}.png`);
+const controls=(id:string)=><fieldset disabled={artwork.exporting} className="studio-controls">{id==="mobile"&&devicePicker}<SegmentedControl id={`${id}-style`} label={t("style")} columns={2} value={style} onChange={setStyle} options={styles.map(item=>({value:item.id,label:item.name}))}/><button type="button" className="text-button" onClick={()=>setAllStyles(value=>!value)}>{allStyles?t("fewerStyles"):t("allStyles")}</button><PaletteSelector value={palette} onChange={setPalette}/><SegmentedControl<Tone> id={`${id}-tone`} label={t("tone")} value={tone} onChange={setTone} options={[{value:"light",label:t("toneLight")},{value:"dark",label:t("toneDark")}]}/><label className="select-control"><span>{t("resolution")}</span><select value={resolution.id} onChange={event=>setResolution(RESOLUTIONS.find(item=>item.id===event.target.value)??RESOLUTIONS[0])}>{sizes.map(item=><option key={item.id} value={item.id}>{item.label} — {landscape&&profile.kind==="tablet"?item.height:item.width} × {landscape&&profile.kind==="tablet"?item.width:item.height}</option>)}</select></label><p className="control-hint">{lang==="id"?"Preview ringan. Bingkai hanya untuk preview. PNG diunduh tanpa perangkat. Bentuk perangkat tetap saat ukuran ekspor berubah.":"A lightweight preview. Device frames are for preview only. Your PNG contains only the wallpaper. Export size does not change the device shape."}</p></fieldset>;
+return <div className="studio-workspace"><section className="artwork-stage" aria-label={t("preview")} aria-busy={artwork.busy}><div className="preview-topline"><span>{STYLES.find(item=>item.id===style)?.name}</span><span>{profile.label}</span></div><div className="device-stage-toolbar">{devicePicker}</div>{(profile.kind==="phone"||profile.kind==="tablet")&&<div className="device-display-options">{profile.kind==="phone"&&<label><input type="checkbox" checked={showClock} onChange={event=>setShowClock(event.target.checked)}/>{lang==="id"?"Tampilkan jam":"Show clock"}</label>}{profile.kind==="tablet"&&<label><span>{lang==="id"?"Orientasi":"Orientation"}</span><select aria-label={lang==="id"?"Orientasi tablet":"Tablet orientation"} value={landscape?"landscape":"portrait"} onChange={event=>setLandscape(event.target.value==="landscape")} disabled={artwork.exporting}><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>}</div>}<div ref={devicePreviewRef} className="device-preview-viewport"><DeviceFrame device={device} width={exportResolution.width} height={exportResolution.height} showClock={showClock} landscape={landscape}><canvas ref={artwork.canvasRef} role="img" aria-label={t("artwork")}/>{artwork.busy&&<div className="preview-loading"><LoadingIndicator size={52} label={t("generating")}/></div>}</DeviceFrame></div><div className="preview-bottomline"><span>{palette.name}</span><span>{t("exportSize")}: {exportResolution.width} × {exportResolution.height}</span></div><div className="job-feedback" aria-live="polite">{artwork.error&&<p role="alert">{artwork.error}</p>}{artwork.notice&&<p>{artwork.notice}</p>}{artwork.exporting&&<p>{t("exporting")} <button type="button" onClick={artwork.cancelExport}>{t("cancel")}</button></p>}</div><p className="creator-credit">by Creator Herald Michain Samuel Theo Ginting</p></section><aside className="desktop-controls"><div className="controls-scroll">{controls("desktop")}</div><div className="studio-actions"><button type="button" className="button-secondary" disabled={artwork.exporting} onClick={()=>setSeed(value=>value+1)}><Shuffle size={17}/>{t("generate")}</button><button type="button" className="button-primary" disabled={!artwork.ready||artwork.exporting} onClick={download}>{artwork.exporting?<LoadingIndicator variant="ring" size={17} label=""/>:<Download size={17}/>} {t("download")}</button></div></aside><div className="mobile-actions"><button type="button" disabled={artwork.exporting} aria-label={t("generate")} onClick={()=>setSeed(value=>value+1)}><Shuffle size={20}/></button><button type="button" disabled={artwork.exporting} onClick={()=>dialogRef.current?.showModal()}><SlidersHorizontal size={18}/><span>{t("settings")}</span></button><button type="button" className="button-primary" disabled={!artwork.ready||artwork.exporting} onClick={download}>{artwork.exporting?<LoadingIndicator variant="ring" size={18} label=""/>:<Download size={18}/>}<span>{t("download")}</span></button></div><dialog ref={dialogRef} className="settings-dialog" aria-labelledby="settings-title"><div className="dialog-heading"><h2 id="settings-title">{t("settings")}</h2><button type="button" aria-label={t("close")} onClick={()=>dialogRef.current?.close()}><X size={22}/></button></div><div className="dialog-content">{controls("mobile")}</div><button type="button" className="button-primary dialog-done" onClick={()=>dialogRef.current?.close()}>{t("done")}</button></dialog></div>;
 }

@@ -1,74 +1,13 @@
-/**
- * LuminaWall — dibuat oleh Herald Ginting
- *
- * Root layout: fonts, global metadata and the app-wide providers.
- */
-
-import type { Metadata, Viewport } from "next";
-import { Instrument_Serif, Manrope } from "next/font/google";
+import type {Metadata,Viewport} from "next";
+import {Instrument_Serif,Manrope} from "next/font/google";
 import "./globals.css";
-import { SITE_URL } from "@/lib/site";
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-display",
-});
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-body",
-});
-
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: "LuminaWall — Minimalist Wallpaper Studio",
-  description:
-    "Generate premium minimalist wallpapers in your browser. 100% client-side, free, no sign-up. Desktop 4K and iPhone resolutions.",
-  keywords: ["wallpaper generator", "minimalist wallpaper", "4k wallpaper", "iphone wallpaper"],
-  verification: {
-    google: "8YtQ3I_rI0NQCkINAYVURsAwFt3SyHm-TBJKyb2eZbo",
-  },
-  openGraph: {
-    title: "LuminaWall — Minimalist Wallpaper Studio",
-    description:
-      "Generate premium minimalist wallpapers in your browser. 100% client-side, free, no sign-up. Desktop 4K and iPhone resolutions.",
-    url: SITE_URL,
-    siteName: "LuminaWall",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "LuminaWall — Minimalist Wallpaper Studio",
-    description:
-      "Generate premium minimalist wallpapers in your browser. 100% client-side, free, no sign-up. Desktop 4K and iPhone resolutions.",
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#07090d",
-};
-
-import { LanguageProvider } from "@/lib/i18n";
-
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en">
-      <body
-        className={`${instrumentSerif.variable} ${manrope.variable} font-body antialiased`}
-      >
-        <LanguageProvider>
-          {/* Fixed aurora ambiance behind all content */}
-          <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-            <div className="animate-drift absolute -top-1/4 -left-1/4 h-[70vmax] w-[70vmax] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.10),transparent_60%)]" />
-            <div className="animate-drift-slow absolute -right-1/4 -bottom-1/4 h-[70vmax] w-[70vmax] rounded-full bg-[radial-gradient(circle,rgba(196,181,253,0.10),transparent_60%)]" />
-          </div>
-          {children}
-        </LanguageProvider>
-      </body>
-    </html>
-  );
-}
+import "./devices.css";
+import "./lightfold-motion.css";
+import {SITE_URL} from "@/lib/site";
+import {LanguageProvider} from "@/lib/i18n";
+const editorial=Instrument_Serif({subsets:["latin"],weight:"400",variable:"--font-editorial"});
+const interfaceFont=Manrope({subsets:["latin"],variable:"--font-interface"});
+const description="Create minimalist wallpapers in your browser. Explore generative art, choose a palette, and download a PNG. Free, no account required.";
+export const metadata:Metadata={metadataBase:new URL(SITE_URL),title:{default:"LuminaWall — Wallpaper Studio",template:"%s — LuminaWall"},description,manifest:"/manifest.json",icons:{icon:[{url:"/favicon.ico",sizes:"32x32"},{url:"/logo.svg",type:"image/svg+xml"}],apple:"/apple-touch-icon.png"},openGraph:{title:"LuminaWall — Wallpaper Studio",description,siteName:"LuminaWall",type:"website",images:[{url:"/opengraph.jpg",width:1200,height:630,alt:"LuminaWall generative wallpaper collection"}]},twitter:{card:"summary_large_image",images:["/opengraph.jpg"]}};
+export const viewport:Viewport={themeColor:"#f5f5f7"};
+export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="id"><body className={editorial.variable+" "+interfaceFont.variable+" antialiased"}><LanguageProvider>{children}</LanguageProvider></body></html>;}

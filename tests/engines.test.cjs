@@ -1,0 +1,28 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {createHash}=require('node:crypto');
+const {createCanvas}=require('@napi-rs/canvas');
+const {loadEngine}=require('../scripts/load-engine.cjs');
+global.OffscreenCanvas=class{constructor(w,h){return createCanvas(w,h)}};
+const {canvasSize,previewSize,supportedSize}=loadEngine('lib/canvas.ts');
+const {renderWallpaper,PALETTES,RESOLUTIONS,STYLES}=loadEngine('lib/wallpaper.ts');
+const {renderDensity,getEngine}=loadEngine('lib/attractor.ts');
+const {expand,renderLSystem,PRESETS}=loadEngine('lib/lsystem.ts');
+const {renderArtwork}=loadEngine('lib/render-artwork.ts');
+const pixels=canvas=>canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+const digest=canvas=>createHash("sha256").update(pixels(canvas)).digest("hex");
+const options=(style,seed=37)=>({style,palette:PALETTES[0],resolution:{...RESOLUTIONS[0],width:160,height:100},tone:'light',seed});
+test('fractional dimensions become integer pixel sizes',()=>{assert.deepEqual(canvasSize(101.25,81.75),{width:101,height:81});for(const value of [0,-1,NaN,Infinity])assert.throws(()=>canvasSize(value,10));});
+test('preview preserves aspect ratio and caps cost',()=>{assert.deepEqual(previewSize(3840,2160),{width:960,height:540});assert.deepEqual(previewSize(1290,2796),{width:442,height:960});assert.deepEqual(previewSize(1,16384),{width:1,height:960});assert.throws(()=>previewSize(10,10,0));});
+test('oversize images rejected before allocation',()=>{assert.throws(()=>supportedSize(17000,10));assert.throws(()=>supportedSize(10000,10000));assert.deepEqual(supportedSize(7680,4320),{width:7680,height:4320});});
+test('attractor fractional width regression retains lit pixels',()=>{const orbit=new Float32Array([-1,-1,1,1,.2,.3,-.8,.9]);const a=createCanvas(101,81),b=createCanvas(101,81);renderDensity(a,orbit,101,81);renderDensity(b,orbit,101.25,81.75);assert.deepEqual(pixels(a),pixels(b));assert.ok(pixels(b).some((value,i)=>i%4!==3&&value>0));});
+test('default attractor uses working JS backend without absent WASM request',async()=>{const engine=await getEngine();assert.equal(engine.kind,'js');const orbit=engine.compute({type:'dejong',a:-2.24,b:.43,c:-.65,d:-2.43,iterations:10000});assert.equal(orbit.length,20000);assert.ok(orbit.every(Number.isFinite));});
+for(const style of STYLES)test('style '+style.id+' renders deterministically',()=>{const a=createCanvas(160,100),b=createCanvas(160,100);renderWallpaper(a,options(style.id));renderWallpaper(b,options(style.id));assert.equal(digest(a),digest(b));assert.ok(pixels(a).every((v,i)=>i%4!==3||v===255));});
+test('different seeds produce different mandalas',()=>{const a=createCanvas(160,100),b=createCanvas(160,100);renderWallpaper(a,options('mandala',37));renderWallpaper(b,options('mandala',38));assert.notDeepEqual(pixels(a),pixels(b));});
+test('L-system expansion refuses excessive detail instead of partial output',()=>{assert.equal(expand('F',{F:'F+F'},2),'F+F+F+F');assert.throws(()=>expand('F',{F:'FF'},22),/detail limit/);});
+for(const preset of PRESETS)test('L-system '+preset.id+' produces segments',()=>{const canvas=createCanvas(160,100);const result=renderLSystem(canvas,preset,{iterations:preset.defaultIterations,angle:preset.angle,lengthScale:1},160.7,100.5);assert.ok(result.segments>0);assert.equal(canvas.width,160);});
+test('PNG export encodes actual requested dimensions',async()=>{const canvas=createCanvas(1,1);await renderArtwork(canvas,{kind:'wallpaper',options:options('misty_pines')},360,640);const png=canvas.toBuffer('image/png');assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);assert.equal(png.readUInt32BE(16),360);assert.equal(png.readUInt32BE(20),640);await assert.rejects(()=>renderArtwork(canvas,{kind:'wallpaper',options:options('misty_pines')},20000,10));});
+test('manifest icons and social preview exist',()=>{const manifest=JSON.parse(fs.readFileSync('public/manifest.json','utf8'));for(const icon of manifest.icons)assert.ok(fs.existsSync('public'+icon.src));for(const file of ['favicon.ico','logo.svg','apple-touch-icon.png','opengraph.jpg'])assert.ok(fs.statSync('public/'+file).size>0);});
+
+for(const style of ["aurora","waves","landscape"])for(const tone of ["light","dark"])test(style+" "+tone+" respects seed across intervening renders",()=>{const a=createCanvas(160,100),b=createCanvas(160,100),other=createCanvas(160,100);renderWallpaper(a,{...options(style,37),tone});renderWallpaper(other,{...options(style,38),tone});assert.notEqual(digest(a),digest(other));renderWallpaper(b,{...options(style,37),tone});assert.equal(digest(a),digest(b));});

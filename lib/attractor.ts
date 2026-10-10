@@ -1,3 +1,4 @@
+import { canvasSize, type RenderCanvas } from "@/lib/canvas";
 /**
  * Strange-attractor compute engine with a dual backend:
  *
@@ -160,7 +161,7 @@ let enginePromise: Promise<AttractorEngine> | null = null;
 
 /** Resolve the best available engine (Wasm if built, else JS). Cached. */
 export function getEngine(): Promise<AttractorEngine> {
-  enginePromise ??= loadWasmEngine().then(
+  enginePromise ??= (process.env.NEXT_PUBLIC_ENABLE_WASM === "true" ? loadWasmEngine() : Promise.resolve(null)).then(
     (wasm) => wasm ?? { kind: "js" as const, compute: jsCompute },
   );
   return enginePromise;
@@ -179,16 +180,17 @@ export function getEngine(): Promise<AttractorEngine> {
  * without one it renders classic white-on-black.
  */
 export function renderDensity(
-  canvas: HTMLCanvasElement,
+  canvas: RenderCanvas,
   orbit: Float32Array,
   width: number,
   height: number,
   palette?: Palette,
 ): void {
+  ({ width, height } = canvasSize(width, height));
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) throw new Error("Canvas is unavailable");
 
   // Dynamic bounds (attractors usually live within ±2 but parameters
   // can stretch that); uniform scale, centered, 6% margin.

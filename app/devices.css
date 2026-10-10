@@ -1,0 +1,27 @@
+/* All hardware details share SVG coordinates, at every viewport size. */
+.device-preview-viewport{width:100%;height:100%;min-height:0;container-type:size;display:grid;place-items:center;flex:1}
+.device-frame{position:relative;flex-shrink:0;width:min(96cqw,calc(96cqh * var(--device-ratio)));max-width:100%;filter:drop-shadow(0 13px 14px #15151b1c)}
+.device-vector{position:absolute;inset:0;display:block;width:100%;height:100%;pointer-events:none;overflow:visible}
+.device-screen{position:absolute;overflow:hidden;background:#26262b;isolation:isolate}
+.device-screen>canvas,.device-screen>img{display:block;width:100%;height:100%;object-fit:cover}
+.device-overlay{z-index:2}.device-canvas{filter:none}
+.device-stage-toolbar{width:100%;max-width:260px;flex-shrink:0;display:flex;align-items:center;gap:10px}
+.device-stage-toolbar .device-picker{flex:1;min-width:0}.device-stage-toolbar .select-control>span{display:none}
+.device-stage-toolbar select{background:#fff;font-size:12px;min-height:40px}
+.device-display-options{display:flex;gap:10px;align-items:center;flex-shrink:0;font-size:12px;color:#62626d}
+.device-display-options label{display:flex;align-items:center;gap:5px;cursor:pointer}.device-display-options input{accent-color:#4b435e;width:14px;height:14px}
+.device-display-options select{padding:8px;border:1px solid #d7d7df;border-radius:7px}
+.artwork-stage{justify-content:initial;gap:15px;padding:22px;height:100%;background:#ededf1;overflow:visible}
+.preview-topline,.preview-bottomline{flex-shrink:0;margin:0}.preview-topline span:last-child{color:#686870}
+.studio-workspace .preview-loading{background:#ebebf1bf}
+.hero-art{padding:20px 0 40px;min-width:0}.hero-laptop{width:100%;padding:20px 0 40px;position:relative}
+.hero-laptop .device-laptop{width:94%;margin:auto;max-width:none}.hero-laptop img,.hero-phone img{object-fit:cover}
+.hero-phone{position:absolute;width:24%;aspect-ratio:auto;right:0;bottom:53px;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible}
+.hero-phone .device-phone{width:100%;max-width:none}.hero-art .art-footnote{padding:0 27% 0 0}.hero-art .art-caption{margin:0}
+.hero-art::before{content:"";position:absolute;background:radial-gradient(ellipse,#d8d8e3a0,transparent 65%);inset:0;z-index:-1}
+@media(max-width:900px){.artwork-stage{height:calc(100dvh - 310px);min-height:350px}}
+@media(max-width:700px){.artwork-stage{height:calc(100dvh - 345px);min-height:340px;padding:16px;gap:12px}.device-stage-toolbar select{font-size:11px;min-height:38px}.hero-phone{width:25%;right:0;bottom:48px}.hero-laptop{padding:24px 0 40px}.hero-laptop .device-laptop{width:94%}.device-display-options{font-size:11px}}
+
+.creator-credit{width:100%;flex-shrink:0;margin:0;text-align:right;font-size:10px;line-height:1.5;letter-spacing:.015em;color:#696773}
+@media(max-width:700px){.creator-credit{font-size:9px}}
+

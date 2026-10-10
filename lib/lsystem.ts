@@ -1,3 +1,4 @@
+import { canvasSize, type RenderCanvas } from "@/lib/canvas";
 /**
  * L-System (Lindenmayer System) engine + turtle-graphics renderer.
  * Pure TypeScript, strictly client-side.
@@ -91,8 +92,11 @@ export function expand(
   let current = axiom;
   for (let i = 0; i < iterations; i++) {
     let next = "";
-    for (const ch of current) next += rules[ch] ?? ch;
-    if (next.length > MAX_LENGTH) return current; // stop before it explodes
+    for (const ch of current) {
+      const replacement = rules[ch] ?? ch;
+      if (next.length + replacement.length > MAX_LENGTH) throw new Error("L-System detail limit exceeded");
+      next += replacement;
+    }
     current = next;
   }
   return current;
@@ -166,16 +170,17 @@ export interface RenderOptions {
  * white hairline on near-black slate.
  */
 export function renderLSystem(
-  canvas: HTMLCanvasElement,
+  canvas: RenderCanvas,
   preset: LSystemPreset,
   { iterations, angle, lengthScale, palette }: RenderOptions,
   width: number,
   height: number,
 ): { segments: number } {
+  ({ width, height } = canvasSize(width, height));
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return { segments: 0 };
+  if (!ctx) throw new Error("Canvas is unavailable");
 
   // Background: the palette's deepest color, pulled darker so the
   // hairline strokes keep their contrast; dark slate without one.

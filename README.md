@@ -2,9 +2,9 @@
 
 > **"Wallpapers that feel *designed*, not generated."**
 > 
-> *A 100% client-side, zero-latency procedural wallpaper generator powered by mathematical chaos theory, physics simulations, and generative art.*
+> *A 100% client-side, client-rendered procedural wallpaper generator powered by mathematical chaos theory, physics simulations, and generative art.*
 
-[![Next.js](https://img.shields.io/badge/Next.js-15.3-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
 [![Canvas API](https://img.shields.io/badge/HTML5-Canvas_API-E34F26?style=for-the-badge&logo=html5)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
@@ -16,10 +16,10 @@
 
 Stop downloading generic stock wallpapers compressed to oblivion. **LuminaWall** gives you ultra-crisp, mathematical art rendered in real-time right inside your browser.
 
-- ⚡ **0 Server Latency & 0 Cost**: Everything renders directly on your GPU/CPU via the HTML5 Canvas API. No AI API keys, no server costs, 100% private.
-- 📱 **True Multi-Device Resolution**: Direct export in native **Desktop 4K** (3840×2160), **iPhone Retina** (1290×2796), **MacBook Liquid Retina** (3024×1964), and **iPad** (2048×2732).
+- **Client-side rendering**: Artwork is processed in the browser without an image-generation API. Rendering time and export limits depend on the device.
+- 📱 **True Multi-Device Resolution**: Direct export in native **Desktop 4K** (3840×2160), **iPhone Retina** (1320×2868), **MacBook Liquid Retina** (3024×1964), and **iPad** (2064×2752).
 - 🎯 **Curated Aesthetics**: No random ugly color clashes. Hand-crafted color palettes (*Obsidian Gold*, *Royal Velvet*, *Sage & Platinum*, *Monaco Midnight*) engineered for modern dark/light desk setups.
-- 📐 **Device Frame Mockup**: Real-time CSS live preview inside device bezels (Dynamic Island for iPhone, Notch for MacBook) so you see exact alignment before exporting.
+- 📐 **Device Frame Mockup**: SVG device preview inside device bezels (Dynamic Island for iPhone, Notch for MacBook) so you see exact alignment before exporting.
 
 ---
 
@@ -65,7 +65,7 @@ Used in **Julia** generator.
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Graphics Engine**: HTML5 2D Canvas API
-- **Icons & UI**: [Lucide React](https://lucide.dev/), [Framer Motion](https://www.framer.com/motion/)
+- **Icons & UI**: [Lucide React](https://lucide.dev/) and CSS/SVG motion
 
 ---
 
@@ -100,3 +100,17 @@ Distributed under the **MIT License**. Free for personal and commercial wallpape
 <p center>
   Crafted with ❤️ by <b>loxleyftsck</b> • Powered by Mathematics & Code
 </p>
+
+## Production release checks
+
+Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm audit --audit-level=high` before releasing.
+
+Set `NEXT_PUBLIC_SITE_URL` to the actual HTTPS public origin, with no path, query, credentials or fragment. Then run `npm run build:production`. This command validates the public origin before compiling and rejects localhost, IP addresses, insecure HTTP and placeholder domains. Vercel production can derive its origin from `VERCEL_PROJECT_PRODUCTION_URL` when the explicit variable is absent. On other hosting providers, use `REQUIRE_PRODUCTION_URL=true` in the production environment as well. Keep the environment value consistent between build and runtime.
+
+For local development, the default is `http://localhost:3000`. A local build is not production-domain verification. After starting the built server, run `npm run smoke:metadata`; `SMOKE_BASE_URL` selects the server being inspected, while `NEXT_PUBLIC_SITE_URL` selects the expected canonical origin. Checks cover canonical URLs on all four routes and the generated robots/sitemap URLs.
+
+The GitHub workflow runs the quality checks and starts the built server for metadata smoke checks using an explicitly marked CI fixture domain. CI does not deploy. Configure the real domain in the deployment environment, and verify staging/production before exposing the release.
+
+Lightfold logo/motion assets are under `public/brand`, `public/animations`, `components/LogoMark.tsx`, `components/LoadingIndicator.tsx` and `app/lightfold-motion.css`. The ring loading path is adapted from SVG Spinners, with its MIT notice retained at `public/animations/SVG-SPINNERS-LICENSE.txt`. Animations respect reduced motion. PNG exports contain the artwork only.
+
+Rollback: retain the previous deployment/build and its environment configuration. Revert the release if preview/export fails, metadata points to the wrong origin, or a target browser cannot complete the main workflow.

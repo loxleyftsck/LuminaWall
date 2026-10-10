@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: { unoptimized: true },
   // Disable webpack symlink resolution: webpack calls fs.readlink() on
   // every resolved module path to check for symlinks. The fs-level patch
   // (windows-readlink-patch.js) converts EISDIR → EINVAL, and this flag
@@ -38,6 +39,7 @@ const nextConfig: NextConfig = {
             "img-src 'self' blob: data:",
             "font-src 'self' data:",
             "connect-src 'self'",
+            "worker-src 'self' blob:",
             "frame-ancestors 'none'",
           ].join("; "),
         },

@@ -1,0 +1,16 @@
+/* Lightfold entrance, hover and pending states. Ring path: SVG Spinners, MIT (see included license). */
+.lightfold-mark{display:inline-block;flex-shrink:0;overflow:visible;vertical-align:middle}
+.lightfold-leaf{transform-origin:64px 104px;transition:transform .25s ease}
+.lightfold-enter .lightfold-leaf{animation:lightfold-unfold .8s cubic-bezier(.2,.7,.3,1) backwards}
+.lightfold-enter .lightfold-base{animation:lightfold-base-in .55s .12s ease backwards}
+.lightfold-mark:hover .lightfold-leaf,a:hover .lightfold-mark .lightfold-leaf,a:focus-visible .lightfold-mark .lightfold-leaf{transform:translateY(-3px) rotate(-4deg)}
+.lightfold-loading .lightfold-leaf{animation:lightfold-breathe 1.8s ease-in-out infinite}
+.lightfold-loading .lightfold-base{animation:lightfold-base-breathe 1.8s ease-in-out infinite}
+.lightfold-ring{transform-origin:12px 12px;animation:lightfold-spin .85s linear infinite}
+.lightfold-status{display:inline-flex;align-items:center;justify-content:center;gap:10px;color:inherit}
+@keyframes lightfold-unfold{from{opacity:0;transform:translateY(9px) rotate(-14deg)}to{opacity:1;transform:none}}
+@keyframes lightfold-base-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes lightfold-breathe{0%,100%{opacity:1;transform:none}50%{opacity:.65;transform:translateY(-5px) rotate(-6deg)}}
+@keyframes lightfold-base-breathe{0%,100%{opacity:1}50%{opacity:.65}}
+@keyframes lightfold-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.lightfold-leaf,.lightfold-base,.lightfold-ring{animation:none!important;transition:none!important;transform:none!important}}

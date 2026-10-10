@@ -7,6 +7,8 @@
  */
 
 import { createNoise2D, fbm } from "@/lib/noise";
+import { canvasSize, createRenderCanvas, type RenderCanvas, type RenderContext } from "@/lib/canvas";
+import { downloadBlob } from "@/lib/download";
 
 export interface Palette {
   id: string;
@@ -169,7 +171,7 @@ export const RESOLUTIONS: Resolution[] = [
     label: "Desktop 4K",
     width: 3840,
     height: 2160,
-    deviceRef: "4K Monitor / Studio Display",
+    deviceRef: "Dell UltraSharp U2723QE",
     ppi: "Ultra Sharp Desktop",
     panelTech: "IPS / OLED Monitor",
   },
@@ -196,16 +198,16 @@ export const RESOLUTIONS: Resolution[] = [
     label: "Ultra 10K",
     width: 10240,
     height: 4320,
-    deviceRef: "Ultra-Wide 32:9 Multi-Monitor / 10K Canvas",
+    deviceRef: "10K Canvas · 64:27",
     ppi: "Extreme 10K Master Canvas",
     panelTech: "Ultrawide Master Display",
   },
   {
     id: "iphone",
-    label: "iPhone Pro Max",
-    width: 1290,
-    height: 2796,
-    deviceRef: "iPhone 16 / 15 Pro Max",
+    label: "iPhone 16 Pro Max",
+    width: 1320,
+    height: 2868,
+    deviceRef: "iPhone 16 Pro Max",
     ppi: "~460 PPI",
     panelTech: "Super Retina XDR OLED",
   },
@@ -241,28 +243,34 @@ export const RESOLUTIONS: Resolution[] = [
     label: "Mobile 4K",
     width: 1644,
     height: 3840,
-    deviceRef: "Sony Xperia 1 VI / Xperia 1 V",
+    deviceRef: "Sony Xperia 1 V",
     ppi: "~643 PPI (Highest Mobile)",
     panelTech: "4K HDR OLED",
   },
   {
     id: "ipad",
-    label: "iPad",
-    width: 2048,
-    height: 2732,
+    label: "iPad Pro 13″ (M4)",
+    width: 2064,
+    height: 2752,
     deviceRef: "iPad Pro 13-inch",
     ppi: "~264 PPI",
     panelTech: "Tandem OLED / Liquid Retina",
   },
   {
     id: "macbook",
-    label: "MacBook",
+    label: "MacBook Pro 14″",
     width: 3024,
     height: 1964,
-    deviceRef: 'MacBook Pro 16"',
+    deviceRef: 'MacBook Pro 14" (2024)',
     ppi: "~254 PPI",
     panelTech: "Liquid Retina XDR",
   },
+  {id:"laptop_fhd",label:"Laptop Full HD",width:1920,height:1080},
+  {id:"laptop_qhd",label:"Laptop QHD",width:2560,height:1600},
+  {id:"iphone_notch",label:"iPhone 13 Pro Max",width:1284,height:2778},
+  {id:"tablet_android",label:"Galaxy Tab S10 Ultra",width:1848,height:2960},
+  {id:"galaxy_s25",label:"Galaxy S25",width:1080,height:2340},
+  {id:"galaxy_ultra",label:"Galaxy S25 Ultra",width:1440,height:3120},
 ];
 
 export const STYLES: { id: StyleId; name: string; journalRef?: string }[] = [
@@ -320,7 +328,7 @@ const farColor = (p: Palette, tone: Tone) =>
   tone === "light" ? p.colors[1] : p.colors[2];
 
 function paintBase(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -367,7 +375,7 @@ export function buildPaletteLUT(p: Palette, tone: Tone): Uint8ClampedArray {
  * ImageData typed array at true 1:1 native target resolution.
  */
 function drawFlow(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -417,7 +425,7 @@ function drawFlow(
  * overlap accumulates into a glowing particle nebula.
  */
 function drawCosmic(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -563,7 +571,7 @@ interface PetalShape {
 
 /** Sample coherent petal shape modifiers from one random form factor. */
 function randomPetalShape(): PetalShape {
-  const form = Math.random(); // 0 = crystal, 1 = lotus
+  const form = prng(); // 0 = crystal, 1 = lotus
   return {
     peak: 0.42 + form * 0.26,
     bulge: 1.2 + form * 1.2,
@@ -579,7 +587,7 @@ function randomPetalShape(): PetalShape {
  * fold read as 3D paper. Fills only, no strokes.
  */
 function drawPetal(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   length: number,
   halfWidth: number,
   color: string,
@@ -622,7 +630,7 @@ function drawPetal(
  * petals, drawn outermost-first so each smaller layer stacks on top.
  */
 function drawMandala(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -696,7 +704,7 @@ function drawMandala(
  * lower, darker and rougher.
  */
 function drawLandscape(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -721,7 +729,7 @@ function drawLandscape(
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, w, h);
 
-  const noise = createNoise2D();
+  const noise = createNoise2D(prng);
   const lut = buildPaletteLUT(p, tone);
   const layers = 5 + Math.floor(rand(0, 4)); // 5–8 ridge lines
   // Per-generation randomization: base frequency, roughness (fBm gain),
@@ -776,7 +784,7 @@ function drawLandscape(
  *  · circles  — a drifting family of thin rings tracing an envelope.
  */
 function drawParametric(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -875,7 +883,7 @@ function drawParametric(
 
 /** Layered radial "mesh" gradient — soft glowing blobs of palette colors. */
 function drawGradient(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -906,7 +914,7 @@ function drawGradient(
  * the curtain's lower edge, fading toward the top.
  */
 function drawAurora(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -942,7 +950,7 @@ function drawAurora(
   // gradient stops per ray.
   const chapman = (z: number) => Math.exp(1 - z - Math.exp(-z));
 
-  const noise = createNoise2D();
+  const noise = createNoise2D(prng);
   ctx.globalCompositeOperation = dark ? "lighter" : "source-over";
 
   const curtains = 2 + Math.floor(rand(0, 2)); // 2–3 sheets
@@ -989,14 +997,14 @@ function drawAurora(
 
 /** Stacked sine-curve bands flowing across the frame. */
 function drawWaves(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
   tone: Tone,
 ) {
   paintBase(ctx, w, h, p, tone);
-  const noise = createNoise2D();
+  const noise = createNoise2D(prng);
   const bands = 6 + Math.floor(rand(0, 4));
   for (let i = 0; i < bands; i++) {
     const baseY = (h / (bands + 1)) * (i + 1) + rand(-h * 0.05, h * 0.05);
@@ -1029,7 +1037,7 @@ function drawWaves(
  * horizon bands — always balanced, never random scatter.
  */
 function drawGeometric(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1079,7 +1087,7 @@ function drawGeometric(
  * Rendered using a dense stochastic scatter of point sand to keep it clean.
  */
 function drawChladni(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1117,7 +1125,7 @@ function drawChladni(
  * Rendered at 1:1 native resolution using z' = z^2 + c with dynamic parameters.
  */
 function drawJulia(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1174,7 +1182,7 @@ function drawJulia(
  * Simulates Lorenz differential equations in 3D with dynamic rotation.
  */
 function drawLorenz(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1248,7 +1256,7 @@ function drawLorenz(
  * Creates elegant, clean organic flower structures spreading across the canvas at 1:1 resolution.
  */
 function drawFlora(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1307,7 +1315,7 @@ function drawFlora(
     }
   }
 
-  const tempCanvas = document.createElement("canvas");
+  const tempCanvas = createRenderCanvas(w, h);
   tempCanvas.width = w;
   tempCanvas.height = h;
   const tctx = tempCanvas.getContext("2d");
@@ -1324,7 +1332,7 @@ function drawFlora(
  * Penrose Aperiodic Tiling (Quasicrystal Geometry).
  */
 function drawPenrose(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1432,7 +1440,7 @@ function drawPenrose(
  * Quantum Wave Interference & Superposition at 1:1 resolution.
  */
 function drawQuantum(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1491,7 +1499,7 @@ function drawQuantum(
     }
   }
 
-  const tempCanvas = document.createElement("canvas");
+  const tempCanvas = createRenderCanvas(w, h);
   tempCanvas.width = w;
   tempCanvas.height = h;
   const tctx = tempCanvas.getContext("2d");
@@ -1525,7 +1533,7 @@ function drawQuantum(
  * Draws stacked contour layers with resolution-proportional shadow blurs.
  */
 function drawTopography(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1625,7 +1633,7 @@ function drawTopography(
  * with soft rim glow along the contact line and fine photographic film grain.
  */
 function drawTouchOfGod(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1733,7 +1741,7 @@ function drawTouchOfGod(
  * distinct organic folds, metallic shimmer contours, and subtle paper grain.
  */
 function drawIridescentKiss(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1837,7 +1845,7 @@ function drawIridescentKiss(
  * across a deep night sky without blinding white flashbang clipping.
  */
 function drawAuroraGlow(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -1883,9 +1891,9 @@ function drawAuroraGlow(
     const rAmp = h * rand(0.08, 0.16);
     const rFreq = (Math.PI * 2 * rand(1.2, 2.2)) / w;
 
+    const stepX = Math.max(2, w / 300);
     const topCurve: [number, number][] = [];
     const botCurve: [number, number][] = [];
-    const stepX = Math.max(2, w / 400);
 
     for (let x = 0; x <= w; x += stepX) {
       const dy = Math.sin(x * rFreq + r * 1.5) * rAmp + fbm(noise, x * 0.001, r * 3.1 + seedY, 3) * (rAmp * 0.6);
@@ -1949,7 +1957,7 @@ function drawAuroraGlow(
  * and sparse, elegant pine silhouettes along middle & foreground ridges.
  */
 function drawMistyPines(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -2046,7 +2054,7 @@ function drawMistyPines(
  * razor-sharp glowing crest highlights, wind-blown slope shadow gradients, and golden hour haze.
  */
 function drawSilentDunes(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -2079,7 +2087,6 @@ function drawSilentDunes(
     const dColorShadow = p.colors[(d + 1) % p.colors.length];
 
     const dunePts: [number, number][] = [];
-    const stepX = w / numSteps;
 
     for (let i = 0; i <= numSteps; i++) {
       const t = i / numSteps;
@@ -2132,7 +2139,7 @@ function drawSilentDunes(
  * Landscape sky wash, Palette LUT depth, and glowing lunar disc.
  */
 function drawLunarArches(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   p: Palette,
@@ -2342,7 +2349,7 @@ const drawRome = drawQuantum;
 const RENDERERS: Record<
   StyleId,
   (
-    ctx: CanvasRenderingContext2D,
+    ctx: RenderContext,
     w: number,
     h: number,
     p: Palette,
@@ -2375,12 +2382,12 @@ const RENDERERS: Record<
   rome: drawRome,
 };
 
-let grainTileCanvas: HTMLCanvasElement | null = null;
+let grainTileCanvas: RenderCanvas | null = null;
 
-function getGrainPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
-  if (typeof window === "undefined") return null;
+function getGrainPattern(ctx: RenderContext): CanvasPattern | null {
   if (!grainTileCanvas) {
-    grainTileCanvas = document.createElement("canvas");
+    grainTileCanvas = createRenderCanvas(256, 256);
+    const grainRandom = createPRNG(0x4c554d49);
     grainTileCanvas.width = 256;
     grainTileCanvas.height = 256;
     const tCtx = grainTileCanvas.getContext("2d");
@@ -2388,11 +2395,11 @@ function getGrainPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
       const imgData = tCtx.createImageData(256, 256);
       const data = imgData.data;
       for (let i = 0; i < data.length; i += 4) {
-        const val = Math.floor(Math.random() * 255);
+        const val = Math.floor(grainRandom() * 255);
         data[i] = val;
         data[i + 1] = val;
         data[i + 2] = val;
-        data[i + 3] = Math.floor(Math.random() * 22);
+        data[i + 3] = Math.floor(grainRandom() * 22);
       }
       tCtx.putImageData(imgData, 0, 0);
     }
@@ -2405,7 +2412,7 @@ function getGrainPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
  * Fast GPU-accelerated tiled pattern render (<0.2ms).
  */
 function drawMicroGrain(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderContext,
   w: number,
   h: number,
   amount: number = 0.025,
@@ -2425,35 +2432,26 @@ function drawMicroGrain(
  * Each call produces a new deterministic or randomized composition.
  */
 export function renderWallpaper(
-  canvas: HTMLCanvasElement,
+  canvas: RenderCanvas,
   { style, palette, resolution, tone, seed }: RenderOptions,
 ): void {
-  canvas.width = resolution.width;
-  canvas.height = resolution.height;
+  const size = canvasSize(resolution.width, resolution.height);
+  canvas.width = size.width;
+  canvas.height = size.height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) throw new Error("Canvas is unavailable");
 
   const activeSeed = seed !== undefined ? seed : Math.floor(Math.random() * 1000000);
   activePRNG = createPRNG(activeSeed);
 
-  RENDERERS[style](ctx, resolution.width, resolution.height, palette, tone);
-  drawMicroGrain(ctx, resolution.width, resolution.height, 0.025);
+  RENDERERS[style](ctx, size.width, size.height, palette, tone);
+  drawMicroGrain(ctx, size.width, size.height, 0.025);
 }
 
-/** Convert the canvas to a PNG blob and trigger a browser download. */
-export function downloadCanvas(
-  canvas: HTMLCanvasElement,
-  filename: string,
-): void {
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, "image/png");
+/** Encode a PNG and report failures to the caller. */
+export async function downloadCanvas(canvas: HTMLCanvasElement, filename: string): Promise<void> {
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG export failed")), "image/png");
+  });
+  downloadBlob(blob, filename);
 }
